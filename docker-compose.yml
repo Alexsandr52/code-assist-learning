@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_INTERNAL_URL: http://backend:8000
-    expose:
+    ports:
       - "3000"
     depends_on:
       - backend
