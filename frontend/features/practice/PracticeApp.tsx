@@ -25,6 +25,13 @@ const difficultyLabels: Record<Difficulty, string> = {
   advanced: "Сложный"
 };
 
+type CompletionSummary = {
+  accuracy: number;
+  pasteAttempts: number;
+};
+
+type FooterPanel = "author" | "coffee" | "about" | null;
+
 export function PracticeApp() {
   const [languages, setLanguages] = useState<Language[]>(mockLanguages);
   const [libraries, setLibraries] = useState<Library[]>(mockLibraries);
@@ -46,7 +53,8 @@ export function PracticeApp() {
   const [notice, setNotice] = useState("");
   const [catalogNotice, setCatalogNotice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionCompleted, setSessionCompleted] = useState(false);
+  const [completionSummary, setCompletionSummary] = useState<CompletionSummary | null>(null);
+  const [footerPanel, setFooterPanel] = useState<FooterPanel>(null);
 
   useEffect(() => {
     const stored = loadPracticeState();
@@ -171,7 +179,7 @@ export function PracticeApp() {
     setShowExplanation(false);
     setShowHint(false);
     setShowSolution(false);
-    setSessionCompleted(false);
+    setCompletionSummary(null);
   }
 
   function handleTextChange(value: string) {
@@ -232,6 +240,7 @@ export function PracticeApp() {
     if (!session) {
       return;
     }
+    const summary = { accuracy, pasteAttempts };
     try {
       await completePracticeSession(session.sessionId, {
         accuracy,
@@ -242,14 +251,19 @@ export function PracticeApp() {
       setNotice("Сессия завершена локально; backend не подтвердил сохранение.");
     }
     clearPracticeState();
-    setSessionCompleted(true);
+    setCompletionSummary(summary);
+    setSession(null);
+    setBlockIndex(0);
+    setTypedText("");
+    setShowHint(false);
+    setShowSolution(false);
   }
 
   function resetSession() {
     setSession(null);
     setBlockIndex(0);
     setTypedText("");
-    setSessionCompleted(false);
+    setCompletionSummary(null);
     setShowHint(false);
     setShowSolution(false);
     setNotice("");
@@ -309,9 +323,16 @@ export function PracticeApp() {
                 onTextChange={handleTextChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
+                onSkip={goNext}
+                onSkipToExercise={() => {
+                  if (session) {
+                    setTypedText("");
+                    setBlockIndex(session.blocks.length);
+                  }
+                }}
               />
             ) : null}
-            {session && isTrainingDone && !sessionCompleted ? (
+            {session && isTrainingDone ? (
               <ExerciseView
                 session={session}
                 accuracy={accuracy}
@@ -323,15 +344,16 @@ export function PracticeApp() {
                 onComplete={completeSession}
               />
             ) : null}
-            {session && sessionCompleted ? (
+            {completionSummary ? (
               <CompletedView
-                accuracy={accuracy}
-                pasteAttempts={pasteAttempts}
+                accuracy={completionSummary.accuracy}
+                pasteAttempts={completionSummary.pasteAttempts}
                 onNewSession={resetSession}
               />
             ) : null}
           </section>
         </div>
+        <FooterActions activePanel={footerPanel} onSelect={setFooterPanel} />
       </div>
     </main>
   );
@@ -349,6 +371,8 @@ function Trainer(props: {
   onTextChange: (value: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onSkip: () => void;
+  onSkipToExercise: () => void;
 }) {
   const block = props.session.blocks[props.blockIndex];
   const blockProgress = Math.min(100, Math.round((props.typedText.length / block.code.length) * 100));
@@ -391,6 +415,8 @@ function Trainer(props: {
 
       <div className="panel actions">
         <button className="secondary" onClick={props.onToggleExplanation}>Пояснение</button>
+        <button className="secondary" onClick={props.onSkip}>Пропустить блок</button>
+        <button className="secondary" onClick={props.onSkipToExercise}>К заданию</button>
         {props.comparison.exact ? <span className="badge">Блок набран верно. Нажмите Enter.</span> : null}
         {props.showExplanation ? <span className="subtle">{block.explanation}</span> : null}
       </div>
@@ -448,6 +474,50 @@ function CompletedView(props: {
       <h2>Готово</h2>
       <p className="subtle">Прогресс зафиксирован. Можно выбрать новую тему и продолжить практику.</p>
       <button className="primary" onClick={props.onNewSession}>Выбрать новую тему</button>
+    </div>
+  );
+}
+
+function FooterActions(props: {
+  activePanel: FooterPanel;
+  onSelect: (panel: FooterPanel) => void;
+}) {
+  const toggle = (panel: Exclude<FooterPanel, null>) => {
+    props.onSelect(props.activePanel === panel ? null : panel);
+  };
+
+  return (
+    <footer className="footerPanel">
+      <div className="footerActions">
+        <button className="secondary" onClick={() => toggle("author")}>Автор</button>
+        <button className="secondary" onClick={() => toggle("coffee")}>Купить мне кофе</button>
+        <button className="secondary" onClick={() => toggle("about")}>Узнать меня лучше</button>
+      </div>
+      {props.activePanel ? <FooterDetails panel={props.activePanel} /> : null}
+    </footer>
+  );
+}
+
+function FooterDetails(props: { panel: Exclude<FooterPanel, null> }) {
+  const content = {
+    author: {
+      title: "Автор",
+      text: "Александр Полянский, автор MVP тренажёра ручного набора Python-кода. Контакт: @ak_polyanskiy."
+    },
+    coffee: {
+      title: "Купить мне кофе",
+      text: "Что вы ждали? Платежку? А может стоит меня сводить на кофе куда-нибудь?"
+    },
+    about: {
+      title: "Узнать меня лучше",
+      text: "angel-save-me.ru."
+    }
+  }[props.panel];
+
+  return (
+    <div className="footerDetails">
+      <strong>{content.title}</strong>
+      <span>{content.text}</span>
     </div>
   );
 }

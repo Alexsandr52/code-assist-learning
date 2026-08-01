@@ -35,7 +35,7 @@ Open:
 http://your-server-ip
 ```
 
-The frontend serves the app and proxies `/api/*` to the backend container. The browser does not need direct access to port `8000`.
+The frontend serves the app and proxies `/api/*` to the backend container through `BACKEND_INTERNAL_URL=http://backend:8000`. The browser does not need direct access to port `8000`.
 
 ## 3. Check Status
 

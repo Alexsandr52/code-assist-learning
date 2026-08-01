@@ -3,8 +3,10 @@ import secrets
 from pathlib import Path
 from typing import Any
 from redis import Redis
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.config import Settings
+from app.models.cache import ContentCache
 from app.schemas.content import LearningContentPayload
 from app.schemas.practice import PracticeSessionCreate, PracticeSessionOut, CompleteSessionIn
 from app.services.catalog import is_allowed_selection
@@ -68,6 +70,11 @@ class ContentService:
         if cached:
             return cached, "cache"
 
+        persisted = self._read_database(cache_key)
+        if persisted:
+            self._write_cache(cache_key, persisted)
+            return persisted, "database"
+
         fallback = self._load_fallback(payload)
         if self._generation_configured():
             generated = await self._try_generate(payload, cache_key, variant)
@@ -99,6 +106,7 @@ class ContentService:
                         }
                     )
                     content = validate_learning_content(raw)
+                    self._write_database(cache_key, content)
                     self._write_cache(cache_key, content)
                     return content
                 except Exception:
@@ -134,6 +142,35 @@ class ContentService:
         if not raw:
             return None
         return validate_learning_content(json.loads(raw))
+
+    def _read_database(self, key: str) -> LearningContentPayload | None:
+        if self.db is None:
+            return None
+        try:
+            row = self.db.execute(select(ContentCache).where(ContentCache.cache_key == key)).scalar_one_or_none()
+        except Exception:
+            return None
+        if row is None:
+            return None
+        try:
+            return validate_learning_content(row.content_json)
+        except Exception:
+            return None
+
+    def _write_database(self, key: str, content: LearningContentPayload) -> None:
+        if self.db is None:
+            return
+        try:
+            row = self.db.execute(select(ContentCache).where(ContentCache.cache_key == key)).scalar_one_or_none()
+            if row is None:
+                row = ContentCache(cache_key=key, content_json=content.model_dump(mode="json"), status="validated")
+                self.db.add(row)
+            else:
+                row.content_json = content.model_dump(mode="json")
+                row.status = "validated"
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
 
     def _write_cache(self, key: str, content: LearningContentPayload) -> None:
         if not self.redis:

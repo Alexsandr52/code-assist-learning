@@ -1,13 +1,26 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.catalog import router as catalog_router
 from app.api.practice import router as practice_router
 from app.core.config import get_settings
+from app.db.init_db import init_db
 
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        init_db()
+    except Exception:
+        # The MVP can still serve fallback/generated content if PostgreSQL is not reachable.
+        pass
+    yield
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,4 +38,3 @@ def health():
 
 app.include_router(catalog_router)
 app.include_router(practice_router)
-

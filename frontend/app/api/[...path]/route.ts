@@ -34,21 +34,24 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const target = `${BACKEND_URL}/api/${path.join("/")}${url.search}`;
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
 
-  const response = await fetch(target, {
-    method: request.method,
-    headers: {
-      "content-type": request.headers.get("content-type") ?? "application/json"
-    },
-    body,
-    cache: "no-store"
-  });
+  try {
+    const response = await fetch(target, {
+      method: request.method,
+      headers: {
+        "content-type": request.headers.get("content-type") ?? "application/json"
+      },
+      body,
+      cache: "no-store"
+    });
 
-  const responseBody = await response.text();
-  return new NextResponse(responseBody, {
-    status: response.status,
-    headers: {
-      "content-type": response.headers.get("content-type") ?? "application/json"
-    }
-  });
+    const responseBody = await response.text();
+    return new NextResponse(responseBody, {
+      status: response.status,
+      headers: {
+        "content-type": response.headers.get("content-type") ?? "application/json"
+      }
+    });
+  } catch {
+    return NextResponse.json({ detail: "Backend is unavailable" }, { status: 502 });
+  }
 }
-
