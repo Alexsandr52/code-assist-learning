@@ -1,4 +1,6 @@
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.catalog import router as catalog_router
@@ -8,16 +10,21 @@ from app.db.init_db import init_db
 
 
 settings = get_settings()
+logger = logging.getLogger("app.main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting %s", settings.app_name)
     try:
         init_db()
+        logger.info("Database initialized")
     except Exception:
         # The MVP can still serve fallback/generated content if PostgreSQL is not reachable.
+        logger.exception("Database initialization failed; continuing with fallback/generated content")
         pass
     yield
+    logger.info("Stopping %s", settings.app_name)
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
