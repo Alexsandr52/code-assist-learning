@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-code_learn_assist}
+      POSTGRES_USER: ${POSTGRES_USER:-code_learn_assist}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-code_learn_assist}
 
   redis:
     image: redis:7-alpine
@@ -16,11 +16,11 @@ services:
       context: ./backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
-      YANDEX_GPT_ENDPOINT: ${YANDEX_GPT_ENDPOINT:?YANDEX_GPT_ENDPOINT is required}
-      YANDEX_GPT_API_KEY: ${YANDEX_GPT_API_KEY:?YANDEX_GPT_API_KEY is required}
-      YANDEX_GPT_MODEL: ${YANDEX_GPT_MODEL:?YANDEX_GPT_MODEL is required}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://code_learn_assist:code_learn_assist@postgres:5432/code_learn_assist}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      YANDEX_GPT_ENDPOINT: ${YANDEX_GPT_ENDPOINT:-}
+      YANDEX_GPT_API_KEY: ${YANDEX_GPT_API_KEY:-}
+      YANDEX_GPT_MODEL: ${YANDEX_GPT_MODEL:-}
       YANDEX_GPT_TIMEOUT_SECONDS: ${YANDEX_GPT_TIMEOUT_SECONDS:-45}
     depends_on:
       - postgres
@@ -33,6 +33,6 @@ services:
     environment:
       BACKEND_INTERNAL_URL: http://backend:8000
     ports:
-      - "80:3000"
+      - "3000:3000"
     depends_on:
       - backend
