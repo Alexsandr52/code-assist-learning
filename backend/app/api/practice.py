@@ -29,9 +29,34 @@ async def create_practice_session(
     payload: PracticeSessionCreate,
     service: ContentService = Depends(get_content_service),
 ):
+    logger.info(
+        "Creating practice session: language=%s library=%s topic=%s difficulty=%s",
+        payload.language,
+        payload.library,
+        payload.topic,
+        payload.difficulty,
+    )
     try:
-        return await service.create_practice_session(payload)
+        session = await service.create_practice_session(payload)
+        logger.info(
+            "Created practice session: session_id=%s source=%s language=%s library=%s topic=%s difficulty=%s",
+            session.sessionId,
+            session.source,
+            session.language,
+            session.library,
+            session.topic,
+            session.difficulty,
+        )
+        return session
     except LookupError as exc:
+        logger.warning(
+            "Rejected practice session selection: language=%s library=%s topic=%s difficulty=%s detail=%s",
+            payload.language,
+            payload.library,
+            payload.topic,
+            payload.difficulty,
+            exc,
+        )
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception(

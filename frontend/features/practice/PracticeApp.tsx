@@ -186,16 +186,29 @@ export function PracticeApp() {
     }
     setIsLoading(true);
     setNotice("");
+    const practiceRequest = {
+      language,
+      library,
+      topic: selectedTopic.slug,
+      difficulty,
+      anonymousSessionId: getAnonymousSessionId()
+    };
+    console.info("Creating practice session", practiceRequest);
     try {
-      const created = await createPracticeSession({
-        language,
-        library,
-        topic: selectedTopic.slug,
-        difficulty,
-        anonymousSessionId: getAnonymousSessionId()
+      const created = await createPracticeSession(practiceRequest);
+      console.info("Practice session created", {
+        sessionId: created.sessionId,
+        source: created.source,
+        library: created.library,
+        topic: created.topic,
+        difficulty: created.difficulty
       });
       beginSession(created);
     } catch (error) {
+      console.error("Practice session creation failed", {
+        request: practiceRequest,
+        error
+      });
       beginSession(mockSession);
       if (error instanceof ApiError) {
         setNotice(`Backend ответил ${error.status}: ${error.detail ?? "открыт локальный fallback-урок."}`);

@@ -45,6 +45,14 @@ async function proxy(request: NextRequest, context: RouteContext) {
     });
 
     const responseBody = await response.text();
+    if (!response.ok) {
+      console.error("Backend proxy returned an error", {
+        method: request.method,
+        target,
+        status: response.status,
+        body: responseBody
+      });
+    }
     return new NextResponse(responseBody, {
       status: response.status,
       headers: {
