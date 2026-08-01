@@ -177,7 +177,7 @@ export function PracticeApp() {
     () => topics.find((item) => item.slug === topic && item.library === library && item.difficulty === difficulty) ?? null,
     [difficulty, library, topic, topics]
   );
-  const isStartDisabled = isLoading || isCatalogLoading || !selectedTopic;
+  const isStartDisabled = isLoading || !selectedTopic;
 
   async function startPractice() {
     if (!selectedTopic) {
@@ -353,9 +353,10 @@ export function PracticeApp() {
               variant="topics"
             />
             <button className="primary" disabled={isStartDisabled} onClick={startPractice}>
-              {isLoading || isCatalogLoading ? "Загрузка..." : "Начать практику"}
+              {isLoading ? "Загрузка..." : "Начать практику"}
             </button>
-            {isLoading || isCatalogLoading ? <LoadingPanel /> : null}
+            {isLoading ? <LoadingPanel /> : null}
+            {isCatalogLoading ? <div className="subtle">Обновляем список тем...</div> : null}
             {catalogNotice ? <div className="subtle">{catalogNotice}</div> : null}
             {notice ? <div className="notice">{notice}</div> : null}
           </aside>

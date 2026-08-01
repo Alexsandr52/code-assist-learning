@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.db.init_db import init_db
 
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 settings = get_settings()
 logger = logging.getLogger("app.main")
 
