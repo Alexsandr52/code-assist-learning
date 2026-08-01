@@ -54,6 +54,7 @@ export function PracticeApp() {
   const [notice, setNotice] = useState("");
   const [catalogNotice, setCatalogNotice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [completionSummary, setCompletionSummary] = useState<CompletionSummary | null>(null);
   const [footerPanel, setFooterPanel] = useState<FooterPanel>(null);
 
@@ -83,27 +84,55 @@ export function PracticeApp() {
   }, []);
 
   useEffect(() => {
+    let isCurrent = true;
     void fetchLibraries(language)
       .then((items) => {
+        if (!isCurrent) {
+          return;
+        }
         setLibraries(items);
         setCatalogNotice("");
       })
       .catch(() => {
+        if (!isCurrent) {
+          return;
+        }
         setLibraries(mockLibraries);
         setCatalogNotice("Backend недоступен, библиотеки открыты из локального mock.");
       });
+    return () => {
+      isCurrent = false;
+    };
   }, [language]);
 
   useEffect(() => {
+    let isCurrent = true;
+    setIsCatalogLoading(true);
+    setTopics([]);
+    setTopic("");
     void fetchTopics(library, difficulty)
       .then((items) => {
+        if (!isCurrent) {
+          return;
+        }
         setTopics(items);
         setCatalogNotice("");
       })
       .catch(() => {
+        if (!isCurrent) {
+          return;
+        }
         setTopics([]);
         setCatalogNotice("Для выбранной библиотеки и сложности пока нет активных тем.");
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsCatalogLoading(false);
+        }
       });
+    return () => {
+      isCurrent = false;
+    };
   }, [library, difficulty]);
 
   useEffect(() => {
@@ -144,10 +173,15 @@ export function PracticeApp() {
   );
   const accuracy = calculateAccuracy(correctKeystrokes, totalKeystrokes);
   const isTrainingDone = Boolean(session && blockIndex >= session.blocks.length);
+  const selectedTopic = useMemo(
+    () => topics.find((item) => item.slug === topic && item.library === library && item.difficulty === difficulty) ?? null,
+    [difficulty, library, topic, topics]
+  );
+  const isStartDisabled = isLoading || isCatalogLoading || !selectedTopic;
 
   async function startPractice() {
-    if (!topic) {
-      setNotice("Выберите тему перед стартом практики.");
+    if (!selectedTopic) {
+      setNotice(isCatalogLoading ? "Темы загружаются, подождите несколько секунд." : "Выберите тему перед стартом практики.");
       return;
     }
     setIsLoading(true);
@@ -156,7 +190,7 @@ export function PracticeApp() {
       const created = await createPracticeSession({
         language,
         library,
-        topic,
+        topic: selectedTopic.slug,
         difficulty,
         anonymousSessionId: getAnonymousSessionId()
       });
@@ -305,10 +339,10 @@ export function PracticeApp() {
               emptyLabel="Нет активных тем"
               variant="topics"
             />
-            <button className="primary" disabled={isLoading || !topic} onClick={startPractice}>
-              {isLoading ? "Загрузка..." : "Начать практику"}
+            <button className="primary" disabled={isStartDisabled} onClick={startPractice}>
+              {isLoading || isCatalogLoading ? "Загрузка..." : "Начать практику"}
             </button>
-            {isLoading ? <LoadingPanel /> : null}
+            {isLoading || isCatalogLoading ? <LoadingPanel /> : null}
             {catalogNotice ? <div className="subtle">{catalogNotice}</div> : null}
             {notice ? <div className="notice">{notice}</div> : null}
           </aside>
