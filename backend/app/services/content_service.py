@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import secrets
+import time
 from pathlib import Path
 from typing import Any
 from redis import Redis
@@ -71,28 +72,37 @@ class ContentService:
         return {"sessionId": session_id, "status": "completed"}
 
     async def _get_content(self, payload: PracticeSessionCreate, variant: int) -> tuple[LearningContentPayload, str]:
+        started_at = time.perf_counter()
         cache_key = self._cache_key(payload, variant)
         cached = self._read_cache(cache_key)
         if cached:
+            logger.info("Content cache hit: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
             return cached, "cache"
 
         persisted = self._read_database(cache_key)
         if persisted:
             self._write_cache(cache_key, persisted)
+            logger.info("Content database hit: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
             return persisted, "database"
 
         fallback = self._load_fallback(payload)
         if fallback:
             self._write_cache(cache_key, fallback)
+            logger.info("Content file fallback hit: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
             return fallback, "fallback"
 
         if self._generation_configured():
+            logger.info("Generating content via model: key=%s variant=%s", cache_key, variant)
             generated = await self._try_generate_with_budget(payload, cache_key, variant)
             if generated:
+                logger.info("Generated content accepted: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
                 return generated, "generated"
+        else:
+            logger.info("Generation is not configured: key=%s", cache_key)
 
         generic_fallback = self._build_generic_fallback(payload)
         self._write_cache(cache_key, generic_fallback)
+        logger.info("Content generic fallback used: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
         return generic_fallback, "fallback"
 
     async def _try_generate_with_budget(
@@ -103,15 +113,17 @@ class ContentService:
     ) -> LearningContentPayload | None:
         timeout_seconds = min(self.settings.yandex_gpt_timeout_seconds, GENERATION_RESPONSE_BUDGET_SECONDS)
         try:
+            started_at = time.perf_counter()
             return await asyncio.wait_for(self._try_generate(payload, cache_key, variant), timeout=timeout_seconds)
         except TimeoutError:
             logger.warning(
-                "Generation timed out after %.1fs: language=%s library=%s topic=%s difficulty=%s",
+                "Generation timed out after %.1fs: language=%s library=%s topic=%s difficulty=%s elapsed=%.3fs",
                 timeout_seconds,
                 payload.language,
                 payload.library,
                 payload.topic,
                 payload.difficulty,
+                time.perf_counter() - started_at,
             )
             return None
 
@@ -122,7 +134,16 @@ class ContentService:
             return self._read_cache(cache_key)
         try:
             for _ in range(self.settings.max_generation_attempts):
+                attempt_started_at = time.perf_counter()
                 try:
+                    logger.info(
+                        "Generation attempt started: key=%s language=%s library=%s topic=%s difficulty=%s",
+                        cache_key,
+                        payload.language,
+                        payload.library,
+                        payload.topic,
+                        payload.difficulty,
+                    )
                     raw = await self.model_client.generate_learning_content(
                         {
                             "language": payload.language,
@@ -137,8 +158,19 @@ class ContentService:
                     content = validate_learning_content(raw)
                     self._write_database(cache_key, content)
                     self._write_cache(cache_key, content)
+                    logger.info(
+                        "Generation attempt succeeded: key=%s elapsed=%.3fs",
+                        cache_key,
+                        time.perf_counter() - attempt_started_at,
+                    )
                     return content
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Generation attempt failed: key=%s elapsed=%.3fs error=%s",
+                        cache_key,
+                        time.perf_counter() - attempt_started_at,
+                        exc,
+                    )
                     continue
             return None
         finally:
