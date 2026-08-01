@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 import secrets
 from pathlib import Path
 from typing import Any
@@ -14,6 +16,9 @@ from app.services.content_validation import validate_learning_content
 from app.yandex_gpt.client import YandexGPTClient, YandexGPTUnavailable
 
 
+logger = logging.getLogger("app.services.content_service")
+
+
 class PracticeSessionStore:
     def __init__(self) -> None:
         self.sessions: dict[str, PracticeSessionOut] = {}
@@ -23,6 +28,7 @@ class PracticeSessionStore:
 session_store = PracticeSessionStore()
 
 AUTO_VARIANT_COUNT = 24
+GENERATION_RESPONSE_BUDGET_SECONDS = 12
 
 
 class ContentService:
@@ -76,15 +82,38 @@ class ContentService:
             return persisted, "database"
 
         fallback = self._load_fallback(payload)
-        if self._generation_configured():
-            generated = await self._try_generate(payload, cache_key, variant)
-            if generated:
-                return generated, "generated"
-
         if fallback:
             self._write_cache(cache_key, fallback)
             return fallback, "fallback"
-        raise YandexGPTUnavailable("no generated or fallback content is available")
+
+        if self._generation_configured():
+            generated = await self._try_generate_with_budget(payload, cache_key, variant)
+            if generated:
+                return generated, "generated"
+
+        generic_fallback = self._build_generic_fallback(payload)
+        self._write_cache(cache_key, generic_fallback)
+        return generic_fallback, "fallback"
+
+    async def _try_generate_with_budget(
+        self,
+        payload: PracticeSessionCreate,
+        cache_key: str,
+        variant: int,
+    ) -> LearningContentPayload | None:
+        timeout_seconds = min(self.settings.yandex_gpt_timeout_seconds, GENERATION_RESPONSE_BUDGET_SECONDS)
+        try:
+            return await asyncio.wait_for(self._try_generate(payload, cache_key, variant), timeout=timeout_seconds)
+        except TimeoutError:
+            logger.warning(
+                "Generation timed out after %.1fs: language=%s library=%s topic=%s difficulty=%s",
+                timeout_seconds,
+                payload.language,
+                payload.library,
+                payload.topic,
+                payload.difficulty,
+            )
+            return None
 
     async def _try_generate(self, payload: PracticeSessionCreate, cache_key: str, variant: int) -> LearningContentPayload | None:
         lock_key = f"lock:{cache_key}"
@@ -199,11 +228,119 @@ class ContentService:
     def _load_fallback(self, payload: PracticeSessionCreate) -> LearningContentPayload | None:
         candidates = [
             f"{payload.library}_{payload.topic.replace('-', '_')}_{payload.difficulty}.json",
-            "requests_get_requests_beginner.json",
         ]
+        if payload.library == "requests" and payload.topic == "get-requests" and payload.difficulty == "beginner":
+            candidates.append("requests_get_requests_beginner.json")
         base = Path(__file__).resolve().parents[1] / "fallback_content"
         for filename in candidates:
             path = base / filename
             if path.exists():
                 return validate_learning_content(json.loads(path.read_text(encoding="utf-8")))
         return None
+
+    def _build_generic_fallback(self, payload: PracticeSessionCreate) -> LearningContentPayload:
+        snippets = self._generic_snippets(payload.library)
+        content = {
+            "language": payload.language,
+            "library": payload.library,
+            "topic": payload.topic,
+            "difficulty": payload.difficulty,
+            "blocks": snippets["blocks"],
+            "exercise": snippets["exercise"],
+        }
+        return validate_learning_content(content)
+
+    def _generic_snippets(self, library: str) -> dict[str, Any]:
+        snippets_by_library: dict[str, dict[str, Any]] = {
+            "pandas": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas под стандартным псевдонимом pd."},
+                    {"title": "Таблица", "code": "data = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"score\": [98, 95]})", "explanation": "Создаёт DataFrame из словаря со списками значений."},
+                    {"title": "Выбор", "code": "scores = data[[\"name\", \"score\"]]\nprint(scores)", "explanation": "Выбирает нужные столбцы и выводит результат."},
+                ],
+                "exercise": {
+                    "description": "Создайте DataFrame с именами и баллами, затем выведите только эти два столбца.",
+                    "starterCode": "import pandas as pd\n\n",
+                    "hint": "Передайте словарь в pd.DataFrame и выберите столбцы через двойные квадратные скобки.",
+                    "solution": "import pandas as pd\n\ndata = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"score\": [98, 95]})\nprint(data[[\"name\", \"score\"]])",
+                },
+            },
+            "numpy": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import numpy as np", "explanation": "Подключает numpy под стандартным псевдонимом np."},
+                    {"title": "Массив", "code": "values = np.array([2, 4, 6, 8])", "explanation": "Создаёт одномерный массив чисел."},
+                    {"title": "Операция", "code": "doubled = values * 2\nprint(doubled)", "explanation": "Умножает каждый элемент массива без явного цикла."},
+                ],
+                "exercise": {
+                    "description": "Создайте numpy-массив и прибавьте 10 к каждому элементу.",
+                    "starterCode": "import numpy as np\n\n",
+                    "hint": "Операции с массивом применяются ко всем элементам сразу.",
+                    "solution": "import numpy as np\n\nvalues = np.array([2, 4, 6, 8])\nprint(values + 10)",
+                },
+            },
+            "fastapi": {
+                "blocks": [
+                    {"title": "Импорт", "code": "from fastapi import FastAPI", "explanation": "Импортирует класс приложения FastAPI."},
+                    {"title": "Приложение", "code": "app = FastAPI()", "explanation": "Создаёт объект приложения."},
+                    {"title": "Маршрут", "code": "@app.get(\"/health\")\ndef health():\n    return {\"status\": \"ok\"}", "explanation": "Описывает GET-маршрут, который возвращает JSON-ответ."},
+                ],
+                "exercise": {
+                    "description": "Создайте FastAPI-приложение с маршрутом /ping.",
+                    "starterCode": "from fastapi import FastAPI\n\n",
+                    "hint": "Создайте app = FastAPI(), затем добавьте функцию с декоратором @app.get.",
+                    "solution": "from fastapi import FastAPI\n\napp = FastAPI()\n\n@app.get(\"/ping\")\ndef ping():\n    return {\"message\": \"pong\"}",
+                },
+            },
+            "beautifulsoup": {
+                "blocks": [
+                    {"title": "Импорт", "code": "from bs4 import BeautifulSoup", "explanation": "Импортирует BeautifulSoup для разбора HTML."},
+                    {"title": "HTML", "code": "html = \"<h1>Python</h1><p>Practice</p>\"", "explanation": "Сохраняет короткий HTML-фрагмент в строку."},
+                    {"title": "Поиск", "code": "soup = BeautifulSoup(html, \"html.parser\")\nprint(soup.find(\"h1\").text)", "explanation": "Находит первый заголовок h1 и выводит его текст."},
+                ],
+                "exercise": {
+                    "description": "Разберите HTML и выведите текст первого абзаца.",
+                    "starterCode": "from bs4 import BeautifulSoup\n\nhtml = \"<p>Hello</p>\"\n",
+                    "hint": "Создайте BeautifulSoup и используйте find(\"p\").text.",
+                    "solution": "from bs4 import BeautifulSoup\n\nhtml = \"<p>Hello</p>\"\nsoup = BeautifulSoup(html, \"html.parser\")\nprint(soup.find(\"p\").text)",
+                },
+            },
+            "matplotlib": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import matplotlib.pyplot as plt", "explanation": "Подключает pyplot для построения графиков."},
+                    {"title": "Данные", "code": "days = [1, 2, 3]\nvalues = [4, 7, 5]", "explanation": "Готовит списки координат для графика."},
+                    {"title": "График", "code": "plt.plot(days, values)\nplt.title(\"Progress\")", "explanation": "Строит линейный график и задаёт заголовок."},
+                ],
+                "exercise": {
+                    "description": "Постройте простой линейный график по двум спискам.",
+                    "starterCode": "import matplotlib.pyplot as plt\n\n",
+                    "hint": "Передайте два списка в plt.plot и добавьте title.",
+                    "solution": "import matplotlib.pyplot as plt\n\ndays = [1, 2, 3]\nvalues = [4, 7, 5]\nplt.plot(days, values)\nplt.title(\"Progress\")",
+                },
+            },
+            "sqlalchemy": {
+                "blocks": [
+                    {"title": "Импорт", "code": "from sqlalchemy import Column, Integer, String", "explanation": "Импортирует типы колонок для модели."},
+                    {"title": "База", "code": "from sqlalchemy.orm import declarative_base\nBase = declarative_base()", "explanation": "Создаёт базовый класс для ORM-моделей."},
+                    {"title": "Модель", "code": "class User(Base):\n    __tablename__ = \"users\"\n    id = Column(Integer, primary_key=True)\n    name = Column(String)", "explanation": "Описывает таблицу users с колонками id и name."},
+                ],
+                "exercise": {
+                    "description": "Опишите ORM-модель Product с id и title.",
+                    "starterCode": "from sqlalchemy import Column, Integer, String\nfrom sqlalchemy.orm import declarative_base\n\nBase = declarative_base()\n",
+                    "hint": "Создайте класс Product(Base), задайте __tablename__ и две колонки.",
+                    "solution": "from sqlalchemy import Column, Integer, String\nfrom sqlalchemy.orm import declarative_base\n\nBase = declarative_base()\n\nclass Product(Base):\n    __tablename__ = \"products\"\n    id = Column(Integer, primary_key=True)\n    title = Column(String)",
+                },
+            },
+        }
+        return snippets_by_library.get(library, {
+            "blocks": [
+                {"title": "Импорт", "code": "import requests", "explanation": "Подключает библиотеку requests для HTTP-запросов."},
+                {"title": "Запрос", "code": "response = requests.get(\"https://example.com\")", "explanation": "Отправляет GET-запрос и сохраняет ответ."},
+                {"title": "Статус", "code": "print(response.status_code)", "explanation": "Выводит HTTP-код ответа."},
+            ],
+            "exercise": {
+                "description": "Отправьте GET-запрос и выведите статус ответа.",
+                "starterCode": "import requests\n\n",
+                "hint": "Используйте requests.get и атрибут status_code.",
+                "solution": "import requests\n\nresponse = requests.get(\"https://example.com\")\nprint(response.status_code)",
+            },
+        })
