@@ -51,7 +51,12 @@ async function proxy(request: NextRequest, context: RouteContext) {
         "content-type": response.headers.get("content-type") ?? "application/json"
       }
     });
-  } catch {
+  } catch (error) {
+    console.error("Backend proxy request failed", {
+      method: request.method,
+      target,
+      error
+    });
     return NextResponse.json({ detail: "Backend is unavailable" }, { status: 502 });
   }
 }

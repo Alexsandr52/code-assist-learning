@@ -2,6 +2,17 @@ import type { Difficulty, Language, Library, PracticeSession, Topic } from "./ty
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly detail?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function fetchLanguages(): Promise<Language[]> {
   return request<Language[]>("/api/languages");
 }
@@ -43,7 +54,22 @@ export async function completePracticeSession(sessionId: string, stats: {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init);
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    const detail = await readErrorDetail(response);
+    throw new ApiError(`API request failed: ${response.status}`, response.status, detail);
   }
   return response.json() as Promise<T>;
+}
+
+async function readErrorDetail(response: Response): Promise<string | undefined> {
+  try {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const payload = await response.json() as { detail?: unknown };
+      return typeof payload.detail === "string" ? payload.detail : undefined;
+    }
+    const text = await response.text();
+    return text || undefined;
+  } catch {
+    return undefined;
+  }
 }

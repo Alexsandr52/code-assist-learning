@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ApiError,
   completePracticeSession,
   createPracticeSession,
   fetchLanguages,
@@ -160,9 +161,13 @@ export function PracticeApp() {
         anonymousSessionId: getAnonymousSessionId()
       });
       beginSession(created);
-    } catch {
+    } catch (error) {
       beginSession(mockSession);
-      setNotice("Backend недоступен, открыт локальный fallback-урок.");
+      if (error instanceof ApiError) {
+        setNotice(`Backend ответил ${error.status}: ${error.detail ?? "открыт локальный fallback-урок."}`);
+      } else {
+        setNotice("Backend недоступен, открыт локальный fallback-урок.");
+      }
     } finally {
       setIsLoading(false);
     }

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
@@ -12,6 +14,7 @@ from app.services.content_service import ContentService
 
 
 router = APIRouter(prefix="/api/practice-sessions", tags=["practice"])
+logger = logging.getLogger("app.api.practice")
 
 
 def get_content_service(
@@ -30,6 +33,15 @@ async def create_practice_session(
         return await service.create_practice_session(payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "Failed to create practice session: language=%s library=%s topic=%s difficulty=%s",
+            payload.language,
+            payload.library,
+            payload.topic,
+            payload.difficulty,
+        )
+        raise HTTPException(status_code=503, detail="practice session generation is unavailable") from exc
 
 
 @router.get("/{session_id}", response_model=PracticeSessionOut)
@@ -50,4 +62,3 @@ def complete_practice_session(
         return service.complete_practice_session(session_id, payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
