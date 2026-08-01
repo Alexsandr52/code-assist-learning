@@ -25,9 +25,10 @@ Do not put YandexGPT secrets into frontend files.
 ## 2. Start Production Stack
 
 ```bash
-cd infra
-docker compose --env-file ../.env -f docker-compose.prod.yml up --build -d
+docker compose --env-file .env up --build -d
 ```
+
+The production compose file is intentionally placed at repository root as `docker-compose.yml` so App Platform can detect it automatically. Additional compose files in `infra/` are for local development and are not required by App Platform.
 
 Open:
 
@@ -40,21 +41,20 @@ The frontend serves the app and proxies `/api/*` to the backend container throug
 ## 3. Check Status
 
 ```bash
-docker compose --env-file ../.env -f docker-compose.prod.yml ps
-docker compose --env-file ../.env -f docker-compose.prod.yml logs -f backend
-docker compose --env-file ../.env -f docker-compose.prod.yml logs -f frontend
+docker compose --env-file .env ps
+docker compose --env-file .env logs -f backend
+docker compose --env-file .env logs -f frontend
 ```
 
 To update:
 
 ```bash
 git pull
-cd infra
-docker compose --env-file ../.env -f docker-compose.prod.yml up --build -d
+docker compose --env-file .env up --build -d
 ```
 
 ## Why PostgreSQL Is Here
 
 Redis is useful for fast temporary cache and generation locks, but it is not the long-term source of truth. PostgreSQL is needed for persistent generated lessons, review statuses, future users, progress history, error statistics, and recommendations.
 
-Right now the MVP mostly works without PostgreSQL persistence wired deeply. For a real server, keep PostgreSQL in the stack so generated content can be saved permanently in the next iteration instead of paying YandexGPT repeatedly.
+In the current MVP, validated generated lessons are cached in PostgreSQL after Redis misses. Keep PostgreSQL in the stack so published content survives restarts and does not require repeated YandexGPT calls.

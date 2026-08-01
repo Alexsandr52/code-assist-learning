@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      YANDEX_GPT_ENDPOINT: ${YANDEX_GPT_ENDPOINT:?YANDEX_GPT_ENDPOINT is required}
+      YANDEX_GPT_API_KEY: ${YANDEX_GPT_API_KEY:?YANDEX_GPT_API_KEY is required}
+      YANDEX_GPT_MODEL: ${YANDEX_GPT_MODEL:?YANDEX_GPT_MODEL is required}
+      YANDEX_GPT_TIMEOUT_SECONDS: ${YANDEX_GPT_TIMEOUT_SECONDS:-45}
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+    ports:
+      - "80:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  redis-data:

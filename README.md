@@ -55,21 +55,22 @@ http://127.0.0.1:3000
 
 ## Docker Compose
 
-Локально:
+Production / App Platform:
+
+```bash
+docker compose --env-file .env up --build -d
+```
+
+Корневой `docker-compose.yml` содержит production-конфигурацию, потому что App Platform ищет основной compose-файл именно в корне репозитория. Frontend публикуется на `:80`, backend доступен только внутри Docker-сети.
+
+Локально, если нужны проброшенные порты backend/PostgreSQL/Redis:
 
 ```bash
 cd infra
 docker compose --env-file ../.env up --build
 ```
 
-Production:
-
-```bash
-cd infra
-docker compose --env-file ../.env -f docker-compose.prod.yml up --build -d
-```
-
-Production frontend публикуется на `:80`, backend доступен только внутри Docker-сети.
+Локальный frontend будет доступен на `:3000`, backend на `:8000`.
 
 ## Переменные Окружения
 
@@ -109,7 +110,7 @@ npm run build
 Compose config:
 
 ```bash
-docker compose --env-file .env -f infra/docker-compose.prod.yml config --services
+docker compose --env-file .env config --services
 ```
 
 ## Зачем PostgreSQL И Redis
