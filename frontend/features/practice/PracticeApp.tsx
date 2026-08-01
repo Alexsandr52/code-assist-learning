@@ -1,0 +1,538 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  completePracticeSession,
+  createPracticeSession,
+  fetchLanguages,
+  fetchLibraries,
+  fetchTopics
+} from "@/lib/api/client";
+import { mockLanguages, mockLibraries, mockSession, mockTopics } from "@/lib/api/mock";
+import type { Difficulty, Language, Library, PracticeSession, Topic } from "@/lib/api/types";
+import { calculateAccuracy, compareCode } from "@/lib/typing/comparison";
+import {
+  clearPracticeState,
+  getAnonymousSessionId,
+  loadPracticeState,
+  savePracticeState
+} from "@/lib/typing/storage";
+
+const difficulties: Difficulty[] = ["beginner", "intermediate", "advanced"];
+const difficultyLabels: Record<Difficulty, string> = {
+  beginner: "Начальный",
+  intermediate: "Средний",
+  advanced: "Сложный"
+};
+
+export function PracticeApp() {
+  const [languages, setLanguages] = useState<Language[]>(mockLanguages);
+  const [libraries, setLibraries] = useState<Library[]>(mockLibraries);
+  const [topics, setTopics] = useState<Topic[]>(mockTopics);
+  const [language, setLanguage] = useState("python");
+  const [library, setLibrary] = useState("requests");
+  const [topic, setTopic] = useState("get-requests");
+  const [difficulty, setDifficulty] = useState<Difficulty>("beginner");
+  const [session, setSession] = useState<PracticeSession | null>(null);
+  const [blockIndex, setBlockIndex] = useState(0);
+  const [typedText, setTypedText] = useState("");
+  const [correctKeystrokes, setCorrectKeystrokes] = useState(0);
+  const [totalKeystrokes, setTotalKeystrokes] = useState(0);
+  const [pasteAttempts, setPasteAttempts] = useState(0);
+  const [startedAt, setStartedAt] = useState(Date.now());
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [catalogNotice, setCatalogNotice] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [sessionCompleted, setSessionCompleted] = useState(false);
+
+  useEffect(() => {
+    const stored = loadPracticeState();
+    if (stored) {
+      setSession(stored.session);
+      setBlockIndex(stored.blockIndex);
+      setTypedText(stored.typedText);
+      setCorrectKeystrokes(stored.correctKeystrokes);
+      setTotalKeystrokes(stored.totalKeystrokes);
+      setPasteAttempts(stored.pasteAttempts);
+      setStartedAt(stored.startedAt);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchLanguages()
+      .then((items) => {
+        setLanguages(items);
+        setCatalogNotice("");
+      })
+      .catch(() => {
+        setLanguages(mockLanguages);
+        setCatalogNotice("Backend недоступен, каталог открыт из локального mock.");
+      });
+  }, []);
+
+  useEffect(() => {
+    void fetchLibraries(language)
+      .then((items) => {
+        setLibraries(items);
+        setCatalogNotice("");
+      })
+      .catch(() => {
+        setLibraries(mockLibraries);
+        setCatalogNotice("Backend недоступен, библиотеки открыты из локального mock.");
+      });
+  }, [language]);
+
+  useEffect(() => {
+    void fetchTopics(library, difficulty)
+      .then((items) => {
+        setTopics(items);
+        setCatalogNotice("");
+      })
+      .catch(() => {
+        setTopics([]);
+        setCatalogNotice("Для выбранной библиотеки и сложности пока нет активных тем.");
+      });
+  }, [library, difficulty]);
+
+  useEffect(() => {
+    if (libraries.length > 0 && !libraries.some((item) => item.slug === library)) {
+      setLibrary(libraries[0].slug);
+    }
+  }, [libraries, library]);
+
+  useEffect(() => {
+    if (topics.length === 0) {
+      setTopic("");
+      return;
+    }
+    if (!topics.some((item) => item.slug === topic)) {
+      setTopic(topics[0].slug);
+    }
+  }, [topics, topic]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    savePracticeState({
+      session,
+      blockIndex,
+      typedText,
+      correctKeystrokes,
+      totalKeystrokes,
+      pasteAttempts,
+      startedAt
+    });
+  }, [session, blockIndex, typedText, correctKeystrokes, totalKeystrokes, pasteAttempts, startedAt]);
+
+  const currentBlock = session?.blocks[blockIndex] ?? null;
+  const comparison = useMemo(
+    () => compareCode(currentBlock?.code ?? "", typedText),
+    [currentBlock?.code, typedText]
+  );
+  const accuracy = calculateAccuracy(correctKeystrokes, totalKeystrokes);
+  const isTrainingDone = Boolean(session && blockIndex >= session.blocks.length);
+
+  async function startPractice() {
+    if (!topic) {
+      setNotice("Выберите тему перед стартом практики.");
+      return;
+    }
+    setIsLoading(true);
+    setNotice("");
+    try {
+      const created = await createPracticeSession({
+        language,
+        library,
+        topic,
+        difficulty,
+        anonymousSessionId: getAnonymousSessionId()
+      });
+      beginSession(created);
+    } catch {
+      beginSession(mockSession);
+      setNotice("Backend недоступен, открыт локальный fallback-урок.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function beginSession(nextSession: PracticeSession) {
+    setSession(nextSession);
+    setBlockIndex(0);
+    setTypedText("");
+    setCorrectKeystrokes(0);
+    setTotalKeystrokes(0);
+    setPasteAttempts(0);
+    setStartedAt(Date.now());
+    setShowExplanation(false);
+    setShowHint(false);
+    setShowSolution(false);
+    setSessionCompleted(false);
+  }
+
+  function handleTextChange(value: string) {
+    const previous = typedText;
+    setTypedText(value);
+    if (value.length > previous.length) {
+      const expected = currentBlock?.code ?? "";
+      const added = value.slice(previous.length);
+      let correctAdded = 0;
+      for (let index = 0; index < added.length; index += 1) {
+        const absoluteIndex = previous.length + index;
+        if (added[index] === expected[absoluteIndex]) {
+          correctAdded += 1;
+        }
+      }
+      setCorrectKeystrokes((count) => count + correctAdded);
+      setTotalKeystrokes((count) => count + added.length);
+    }
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      const target = event.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      handleTextChange(`${typedText.slice(0, start)}    ${typedText.slice(end)}`);
+      requestAnimationFrame(() => {
+        target.selectionStart = start + 4;
+        target.selectionEnd = start + 4;
+      });
+      return;
+    }
+
+    if (event.key === "Enter" && currentBlock && comparison.exact) {
+      event.preventDefault();
+      goNext();
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    event.preventDefault();
+    setPasteAttempts((count) => count + 1);
+    setNotice("Вставка отключена в режиме ручной тренировки.");
+  }
+
+  function goNext() {
+    if (!session) {
+      return;
+    }
+    setTypedText("");
+    setShowExplanation(false);
+    setNotice("");
+    setBlockIndex((index) => Math.min(index + 1, session.blocks.length));
+  }
+
+  async function completeSession() {
+    if (!session) {
+      return;
+    }
+    try {
+      await completePracticeSession(session.sessionId, {
+        accuracy,
+        durationMs: Date.now() - startedAt,
+        pasteAttempts
+      });
+    } catch {
+      setNotice("Сессия завершена локально; backend не подтвердил сохранение.");
+    }
+    clearPracticeState();
+    setSessionCompleted(true);
+  }
+
+  function resetSession() {
+    setSession(null);
+    setBlockIndex(0);
+    setTypedText("");
+    setSessionCompleted(false);
+    setShowHint(false);
+    setShowSolution(false);
+    setNotice("");
+    clearPracticeState();
+  }
+
+  return (
+    <main className="page">
+      <div className="shell">
+        <header className="topbar">
+          <div>
+            <h1 className="brand">Code Learn Assist</h1>
+            <div className="subtle">Ручная практика синтаксиса Python-библиотек</div>
+          </div>
+          {session ? <button className="secondary" onClick={resetSession}>Новая тема</button> : null}
+        </header>
+
+        <div className="layout">
+          <aside className="panel selector">
+            <ChoiceGroup label="Язык" value={language} onChange={setLanguage} options={languages.map(toOption)} variant="segmented" />
+            <ChoiceGroup label="Библиотека" value={library} onChange={setLibrary} options={libraries.map(toOption)} />
+            <ChoiceGroup
+              label="Сложность"
+              value={difficulty}
+              onChange={(value) => setDifficulty(value as Difficulty)}
+              options={difficulties.map((item) => ({ value: item, label: difficultyLabels[item] }))}
+              variant="segmented"
+            />
+            <ChoiceGroup
+              label="Тема"
+              value={topic}
+              onChange={setTopic}
+              options={topics.map(toOption)}
+              emptyLabel="Нет активных тем"
+              variant="topics"
+            />
+            <button className="primary" disabled={isLoading || !topic} onClick={startPractice}>
+              {isLoading ? "Загрузка..." : "Начать практику"}
+            </button>
+            {isLoading ? <LoadingPanel /> : null}
+            {catalogNotice ? <div className="subtle">{catalogNotice}</div> : null}
+            {notice ? <div className="notice">{notice}</div> : null}
+          </aside>
+
+          <section className="practice">
+            {!session ? <EmptyState /> : null}
+            {session && currentBlock && !isTrainingDone ? (
+              <Trainer
+                session={session}
+                blockIndex={blockIndex}
+                typedText={typedText}
+                comparison={comparison}
+                accuracy={accuracy}
+                pasteAttempts={pasteAttempts}
+                showExplanation={showExplanation}
+                onToggleExplanation={() => setShowExplanation((value) => !value)}
+                onTextChange={handleTextChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              />
+            ) : null}
+            {session && isTrainingDone && !sessionCompleted ? (
+              <ExerciseView
+                session={session}
+                accuracy={accuracy}
+                pasteAttempts={pasteAttempts}
+                showHint={showHint}
+                showSolution={showSolution}
+                onToggleHint={() => setShowHint((value) => !value)}
+                onToggleSolution={() => setShowSolution((value) => !value)}
+                onComplete={completeSession}
+              />
+            ) : null}
+            {session && sessionCompleted ? (
+              <CompletedView
+                accuracy={accuracy}
+                pasteAttempts={pasteAttempts}
+                onNewSession={resetSession}
+              />
+            ) : null}
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function Trainer(props: {
+  session: PracticeSession;
+  blockIndex: number;
+  typedText: string;
+  comparison: ReturnType<typeof compareCode>;
+  accuracy: number;
+  pasteAttempts: number;
+  showExplanation: boolean;
+  onToggleExplanation: () => void;
+  onTextChange: (value: string) => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+}) {
+  const block = props.session.blocks[props.blockIndex];
+  const blockProgress = Math.min(100, Math.round((props.typedText.length / block.code.length) * 100));
+  return (
+    <>
+      <div className="panel">
+        <div className="meta">
+          <span className="badge">{props.session.library}</span>
+          <span className="badge">{props.session.topic}</span>
+          <span className="badge">Источник: {props.session.source}</span>
+          <span className="badge">Блок {props.blockIndex + 1} из {props.session.blocks.length}</span>
+        </div>
+        <h2>{block.title}</h2>
+        <LinearProgress value={blockProgress} label="Набрано символов" />
+        <div className="stats">
+          <div className="stat">Прогресс<strong>{Math.round(((props.blockIndex + Number(props.comparison.exact)) / props.session.blocks.length) * 100)}%</strong></div>
+          <div className="stat">Точность<strong>{props.accuracy}%</strong></div>
+          <div className="stat">Попытки paste<strong>{props.pasteAttempts}</strong></div>
+        </div>
+      </div>
+
+      <div className="typingSurface">
+        <pre className="typingGhost" aria-hidden="true">{block.code}</pre>
+        <pre className="typingOverlay" aria-hidden="true">{renderTypedOverlay(block.code, props.typedText, props.comparison)}</pre>
+        <textarea
+          className="typingInput"
+          value={props.typedText}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+          autoCorrect="off"
+          inputMode="text"
+          aria-label="Область ручного ввода кода"
+          onChange={(event) => props.onTextChange(event.target.value)}
+          onKeyDown={props.onKeyDown}
+          onPaste={props.onPaste}
+          autoFocus
+        />
+      </div>
+
+      <div className="panel actions">
+        <button className="secondary" onClick={props.onToggleExplanation}>Пояснение</button>
+        {props.comparison.exact ? <span className="badge">Блок набран верно. Нажмите Enter.</span> : null}
+        {props.showExplanation ? <span className="subtle">{block.explanation}</span> : null}
+      </div>
+    </>
+  );
+}
+
+function ExerciseView(props: {
+  session: PracticeSession;
+  accuracy: number;
+  pasteAttempts: number;
+  showHint: boolean;
+  showSolution: boolean;
+  onToggleHint: () => void;
+  onToggleSolution: () => void;
+  onComplete: () => void;
+}) {
+  return (
+    <div className="panel exercise">
+      <div className="meta">
+        <span className="badge">{props.session.library}</span>
+        <span className="badge">Точность: {props.accuracy}%</span>
+        <span className="badge">Paste: {props.pasteAttempts}</span>
+      </div>
+      <h2>Практическое задание</h2>
+      <p>{props.session.exercise.description}</p>
+      <textarea className="textarea" defaultValue={props.session.exercise.starterCode} spellCheck={false} />
+      <div className="actions">
+        <button className="secondary" onClick={props.onToggleHint}>Подсказка</button>
+        <button className="secondary" onClick={props.onToggleSolution}>Решение</button>
+        <button className="primary" onClick={props.onComplete}>Завершить сессию</button>
+      </div>
+      {props.showHint ? <div className="inlineNote">{props.session.exercise.hint}</div> : null}
+      {props.showSolution ? (
+        <div className="codeBox">
+          <pre>{props.session.exercise.solution}</pre>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompletedView(props: {
+  accuracy: number;
+  pasteAttempts: number;
+  onNewSession: () => void;
+}) {
+  return (
+    <div className="panel completion">
+      <div className="meta">
+        <span className="badge">Сессия завершена</span>
+        <span className="badge">Точность: {props.accuracy}%</span>
+        <span className="badge">Paste: {props.pasteAttempts}</span>
+      </div>
+      <h2>Готово</h2>
+      <p className="subtle">Прогресс зафиксирован. Можно выбрать новую тему и продолжить практику.</p>
+      <button className="primary" onClick={props.onNewSession}>Выбрать новую тему</button>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="panel">
+      <h2>Выберите параметры и начните практику</h2>
+      <p className="subtle">В MVP поддерживается Python. Код не выполняется на сервере, тренировка проверяет только точность ручного набора.</p>
+    </div>
+  );
+}
+
+function ChoiceGroup(props: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  emptyLabel?: string;
+  variant?: "cards" | "segmented" | "topics";
+}) {
+  const hasOptions = props.options.length > 0;
+  const className = props.variant === "segmented" ? "choiceGroup segmented" : props.variant === "topics" ? "choiceGroup topicChoices" : "choiceGroup";
+  return (
+    <div className="field">
+      <label>{props.label}</label>
+      <div className={className} role="listbox" aria-label={props.label}>
+        {hasOptions ? (
+          props.options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={option.value === props.value ? "choice active" : "choice"}
+              aria-selected={option.value === props.value}
+              onClick={() => props.onChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ))
+        ) : (
+          <div className="emptyChoice">{props.emptyLabel ?? "Нет вариантов"}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <div className="loadingPanel" role="status" aria-live="polite">
+      <div className="loadingTitle">Генерация урока</div>
+      <div className="subtle">Проверяем кэш, базу и при необходимости ждём YandexGPT.</div>
+      <div className="indeterminateBar" aria-hidden="true">
+        <span />
+      </div>
+    </div>
+  );
+}
+
+function LinearProgress(props: { value: number; label: string }) {
+  return (
+    <div className="linearProgress" aria-label={`${props.label}: ${props.value}%`}>
+      <div className="progressHeader">
+        <span>{props.label}</span>
+        <span>{props.value}%</span>
+      </div>
+      <div className="progressTrack">
+        <span style={{ width: `${props.value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function toOption(item: { slug: string; name: string }) {
+  return { value: item.slug, label: item.name };
+}
+
+function renderTypedOverlay(expected: string, typed: string, comparison: ReturnType<typeof compareCode>) {
+  const chars = [...typed.slice(0, expected.length)].map((char, index) => (
+    <span key={`typed-${index}`} className={`char ${comparison.statuses[index] === "correct" ? "correct" : "incorrect"}`}>
+      {char === "\n" ? "\n" : char}
+    </span>
+  ));
+  const extras = typed.slice(expected.length).split("").map((char, index) => (
+    <span key={`extra-${index}`} className="char extra">{char}</span>
+  ));
+  return [...chars, ...extras];
+}

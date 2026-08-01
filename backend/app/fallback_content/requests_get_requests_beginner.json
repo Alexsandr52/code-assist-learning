@@ -1,0 +1,30 @@
+{
+  "language": "python",
+  "library": "requests",
+  "topic": "GET-запросы",
+  "difficulty": "beginner",
+  "blocks": [
+    {
+      "title": "Импорт библиотеки",
+      "code": "import requests",
+      "explanation": "Подключает библиотеку requests, чтобы отправлять HTTP-запросы."
+    },
+    {
+      "title": "GET-запрос",
+      "code": "response = requests.get(\"https://example.com\")",
+      "explanation": "Отправляет GET-запрос на указанный адрес и сохраняет ответ в переменную."
+    },
+    {
+      "title": "Код ответа",
+      "code": "print(response.status_code)",
+      "explanation": "Печатает HTTP-код ответа, например 200 для успешного запроса."
+    }
+  ],
+  "exercise": {
+    "description": "Отправьте GET-запрос на https://example.com и выведите код ответа.",
+    "starterCode": "import requests\n\n",
+    "hint": "Используйте requests.get, затем обратитесь к response.status_code.",
+    "solution": "import requests\n\nresponse = requests.get(\"https://example.com\")\nprint(response.status_code)"
+  }
+}
+
