@@ -101,7 +101,6 @@ class ContentService:
             logger.info("Generation is not configured: key=%s", cache_key)
 
         generic_fallback = self._build_generic_fallback(payload)
-        self._write_cache(cache_key, generic_fallback)
         logger.info("Content generic fallback used: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
         return generic_fallback, "fallback"
 
@@ -271,7 +270,7 @@ class ContentService:
         return None
 
     def _build_generic_fallback(self, payload: PracticeSessionCreate) -> LearningContentPayload:
-        snippets = self._generic_snippets(payload.library)
+        snippets = self._generic_snippets(payload.library, payload.topic, payload.difficulty)
         content = {
             "language": payload.language,
             "library": payload.library,
@@ -282,21 +281,11 @@ class ContentService:
         }
         return validate_learning_content(content)
 
-    def _generic_snippets(self, library: str) -> dict[str, Any]:
+    def _generic_snippets(self, library: str, topic: str, difficulty: str) -> dict[str, Any]:
+        if library == "pandas":
+            return self._pandas_snippets(topic, difficulty)
+
         snippets_by_library: dict[str, dict[str, Any]] = {
-            "pandas": {
-                "blocks": [
-                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas под стандартным псевдонимом pd."},
-                    {"title": "Таблица", "code": "data = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"score\": [98, 95]})", "explanation": "Создаёт DataFrame из словаря со списками значений."},
-                    {"title": "Выбор", "code": "scores = data[[\"name\", \"score\"]]\nprint(scores)", "explanation": "Выбирает нужные столбцы и выводит результат."},
-                ],
-                "exercise": {
-                    "description": "Создайте DataFrame с именами и баллами, затем выведите только эти два столбца.",
-                    "starterCode": "import pandas as pd\n\n",
-                    "hint": "Передайте словарь в pd.DataFrame и выберите столбцы через двойные квадратные скобки.",
-                    "solution": "import pandas as pd\n\ndata = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"score\": [98, 95]})\nprint(data[[\"name\", \"score\"]])",
-                },
-            },
             "numpy": {
                 "blocks": [
                     {"title": "Импорт", "code": "import numpy as np", "explanation": "Подключает numpy под стандартным псевдонимом np."},
@@ -376,3 +365,139 @@ class ContentService:
                 "solution": "import requests\n\nresponse = requests.get(\"https://example.com\")\nprint(response.status_code)",
             },
         })
+
+    def _pandas_snippets(self, topic: str, difficulty: str) -> dict[str, Any]:
+        snippets_by_topic: dict[str, dict[str, Any]] = {
+            "select-columns": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas под стандартным псевдонимом pd."},
+                    {"title": "Таблица", "code": "users = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"age\": [36, 54], \"city\": [\"London\", \"Helsinki\"]})", "explanation": "Создаёт таблицу с несколькими столбцами."},
+                    {"title": "Столбцы", "code": "profile = users[[\"name\", \"city\"]]\nprint(profile)", "explanation": "Выбирает два нужных столбца через список имён."},
+                ],
+                "exercise": {
+                    "description": "Выберите из DataFrame только столбцы product и price.",
+                    "starterCode": "import pandas as pd\n\nitems = pd.DataFrame({\"product\": [\"book\", \"pen\"], \"price\": [12, 3], \"stock\": [5, 20]})\n",
+                    "hint": "Для нескольких столбцов используйте двойные квадратные скобки.",
+                    "solution": "import pandas as pd\n\nitems = pd.DataFrame({\"product\": [\"book\", \"pen\"], \"price\": [12, 3], \"stock\": [5, 20]})\nprint(items[[\"product\", \"price\"]])",
+                },
+            },
+            "dataframes": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Данные", "code": "data = {\"city\": [\"Paris\", \"Rome\"], \"temp\": [21, 25]}", "explanation": "Готовит словарь со списками одинаковой длины."},
+                    {"title": "DataFrame", "code": "weather = pd.DataFrame(data)\nprint(weather)", "explanation": "Создаёт DataFrame и выводит его."},
+                ],
+                "exercise": {
+                    "description": "Создайте DataFrame с колонками name и score.",
+                    "starterCode": "import pandas as pd\n\n",
+                    "hint": "Передайте словарь в pd.DataFrame.",
+                    "solution": "import pandas as pd\n\nscores = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"score\": [98, 95]})\nprint(scores)",
+                },
+            },
+            "filter-rows": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Продажи", "code": "sales = pd.DataFrame({\"item\": [\"book\", \"pen\", \"bag\"], \"price\": [12, 3, 40]})", "explanation": "Создаёт таблицу товаров и цен."},
+                    {"title": "Фильтр", "code": "expensive = sales[sales[\"price\"] > 10]\nprint(expensive)", "explanation": "Оставляет строки, где цена больше 10."},
+                ],
+                "exercise": {
+                    "description": "Оставьте строки, где значение score не меньше 90.",
+                    "starterCode": "import pandas as pd\n\nscores = pd.DataFrame({\"name\": [\"Ada\", \"Linus\", \"Guido\"], \"score\": [98, 87, 91]})\n",
+                    "hint": "Сравните столбец score с порогом и передайте маску в DataFrame.",
+                    "solution": "import pandas as pd\n\nscores = pd.DataFrame({\"name\": [\"Ada\", \"Linus\", \"Guido\"], \"score\": [98, 87, 91]})\nprint(scores[scores[\"score\"] >= 90])",
+                },
+            },
+            "groupby": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Заказы", "code": "orders = pd.DataFrame({\"region\": [\"EU\", \"US\", \"EU\"], \"amount\": [100, 80, 120]})", "explanation": "Создаёт таблицу заказов по регионам."},
+                    {"title": "Группировка", "code": "totals = orders.groupby(\"region\")[\"amount\"].sum()\nprint(totals)", "explanation": "Суммирует продажи внутри каждой группы."},
+                ],
+                "exercise": {
+                    "description": "Посчитайте средний score для каждой команды.",
+                    "starterCode": "import pandas as pd\n\nscores = pd.DataFrame({\"team\": [\"A\", \"B\", \"A\"], \"score\": [10, 8, 14]})\n",
+                    "hint": "Сгруппируйте по team и вызовите mean для score.",
+                    "solution": "import pandas as pd\n\nscores = pd.DataFrame({\"team\": [\"A\", \"B\", \"A\"], \"score\": [10, 8, 14]})\nprint(scores.groupby(\"team\")[\"score\"].mean())",
+                },
+            },
+            "missing-values": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Пропуски", "code": "data = pd.DataFrame({\"name\": [\"Ada\", \"Linus\", None], \"score\": [98, None, 91]})", "explanation": "Создаёт таблицу с пропущенными значениями."},
+                    {"title": "Заполнение", "code": "data[\"score\"] = data[\"score\"].fillna(0)\nprint(data)", "explanation": "Заменяет пропуски в числовом столбце на 0."},
+                ],
+                "exercise": {
+                    "description": "Удалите строки, где отсутствует email.",
+                    "starterCode": "import pandas as pd\n\nusers = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"email\": [\"ada@example.com\", None]})\n",
+                    "hint": "Используйте dropna с subset.",
+                    "solution": "import pandas as pd\n\nusers = pd.DataFrame({\"name\": [\"Ada\", \"Linus\"], \"email\": [\"ada@example.com\", None]})\nprint(users.dropna(subset=[\"email\"]))",
+                },
+            },
+            "merge-join": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Таблицы", "code": "users = pd.DataFrame({\"user_id\": [1, 2], \"name\": [\"Ada\", \"Linus\"]})\norders = pd.DataFrame({\"user_id\": [1, 1], \"amount\": [20, 35]})", "explanation": "Создаёт две таблицы с общим ключом user_id."},
+                    {"title": "Объединение", "code": "merged = orders.merge(users, on=\"user_id\", how=\"left\")\nprint(merged)", "explanation": "Добавляет данные пользователя к заказам."},
+                ],
+                "exercise": {
+                    "description": "Объедините таблицы products и prices по product_id.",
+                    "starterCode": "import pandas as pd\n\nproducts = pd.DataFrame({\"product_id\": [1, 2], \"name\": [\"book\", \"pen\"]})\nprices = pd.DataFrame({\"product_id\": [1, 2], \"price\": [12, 3]})\n",
+                    "hint": "Используйте merge с параметром on.",
+                    "solution": "import pandas as pd\n\nproducts = pd.DataFrame({\"product_id\": [1, 2], \"name\": [\"book\", \"pen\"]})\nprices = pd.DataFrame({\"product_id\": [1, 2], \"price\": [12, 3]})\nprint(products.merge(prices, on=\"product_id\"))",
+                },
+            },
+            "datetime": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Даты", "code": "events = pd.DataFrame({\"date\": [\"2026-01-01\", \"2026-01-03\"], \"value\": [10, 14]})", "explanation": "Создаёт таблицу со строковыми датами."},
+                    {"title": "Преобразование", "code": "events[\"date\"] = pd.to_datetime(events[\"date\"])\nevents[\"day\"] = events[\"date\"].dt.day", "explanation": "Преобразует строки в даты и извлекает день месяца."},
+                ],
+                "exercise": {
+                    "description": "Преобразуйте столбец created_at в datetime и выведите год.",
+                    "starterCode": "import pandas as pd\n\nlogs = pd.DataFrame({\"created_at\": [\"2026-02-10\", \"2026-03-12\"]})\n",
+                    "hint": "Используйте pd.to_datetime и accessor dt.year.",
+                    "solution": "import pandas as pd\n\nlogs = pd.DataFrame({\"created_at\": [\"2026-02-10\", \"2026-03-12\"]})\nlogs[\"created_at\"] = pd.to_datetime(logs[\"created_at\"])\nprint(logs[\"created_at\"].dt.year)",
+                },
+            },
+            "pivot-tables": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Продажи", "code": "sales = pd.DataFrame({\"region\": [\"EU\", \"EU\", \"US\"], \"quarter\": [1, 2, 1], \"amount\": [100, 120, 90]})", "explanation": "Создаёт длинную таблицу продаж."},
+                    {"title": "Pivot", "code": "report = sales.pivot_table(index=\"region\", columns=\"quarter\", values=\"amount\", aggfunc=\"sum\")\nprint(report)", "explanation": "Строит сводную таблицу по регионам и кварталам."},
+                ],
+                "exercise": {
+                    "description": "Постройте pivot_table с суммой amount по manager и month.",
+                    "starterCode": "import pandas as pd\n\nsales = pd.DataFrame({\"manager\": [\"Ann\", \"Ann\", \"Bob\"], \"month\": [1, 2, 1], \"amount\": [10, 15, 7]})\n",
+                    "hint": "manager должен быть index, month должен быть columns.",
+                    "solution": "import pandas as pd\n\nsales = pd.DataFrame({\"manager\": [\"Ann\", \"Ann\", \"Bob\"], \"month\": [1, 2, 1], \"amount\": [10, 15, 7]})\nprint(sales.pivot_table(index=\"manager\", columns=\"month\", values=\"amount\", aggfunc=\"sum\"))",
+                },
+            },
+            "rolling-window": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas для работы с временными рядами."},
+                    {"title": "Ряд", "code": "sales = pd.DataFrame({\"day\": pd.date_range(\"2026-01-01\", periods=5), \"amount\": [10, 15, 13, 20, 18]})", "explanation": "Создаёт упорядоченный ряд дневных продаж."},
+                    {"title": "Окно", "code": "sales[\"rolling_mean\"] = sales[\"amount\"].rolling(window=3).mean()\nprint(sales[[\"day\", \"rolling_mean\"]])", "explanation": "Считает скользящее среднее по окну из трёх строк."},
+                ],
+                "exercise": {
+                    "description": "Добавьте столбец rolling_max с максимумом visits за последние 2 строки.",
+                    "starterCode": "import pandas as pd\n\ntraffic = pd.DataFrame({\"day\": pd.date_range(\"2026-01-01\", periods=4), \"visits\": [30, 45, 40, 60]})\n",
+                    "hint": "Вызовите rolling(window=2).max() у столбца visits.",
+                    "solution": "import pandas as pd\n\ntraffic = pd.DataFrame({\"day\": pd.date_range(\"2026-01-01\", periods=4), \"visits\": [30, 45, 40, 60]})\ntraffic[\"rolling_max\"] = traffic[\"visits\"].rolling(window=2).max()\nprint(traffic)",
+                },
+            },
+            "apply-transform": {
+                "blocks": [
+                    {"title": "Импорт", "code": "import pandas as pd", "explanation": "Подключает pandas."},
+                    {"title": "Данные", "code": "orders = pd.DataFrame({\"region\": [\"EU\", \"US\", \"EU\"], \"amount\": [100, 80, 120]})", "explanation": "Создаёт таблицу заказов."},
+                    {"title": "Transform", "code": "orders[\"region_total\"] = orders.groupby(\"region\")[\"amount\"].transform(\"sum\")\nprint(orders)", "explanation": "Добавляет сумму по группе в каждую исходную строку."},
+                ],
+                "exercise": {
+                    "description": "Добавьте столбец centered: score минус средний score внутри команды.",
+                    "starterCode": "import pandas as pd\n\nscores = pd.DataFrame({\"team\": [\"A\", \"A\", \"B\"], \"score\": [10, 14, 7]})\n",
+                    "hint": "Используйте groupby(...).transform(\"mean\") и вычтите результат.",
+                    "solution": "import pandas as pd\n\nscores = pd.DataFrame({\"team\": [\"A\", \"A\", \"B\"], \"score\": [10, 14, 7]})\nscores[\"centered\"] = scores[\"score\"] - scores.groupby(\"team\")[\"score\"].transform(\"mean\")\nprint(scores)",
+                },
+            },
+        }
+
+        return snippets_by_topic.get(topic) or snippets_by_topic.get(difficulty) or snippets_by_topic["dataframes"]

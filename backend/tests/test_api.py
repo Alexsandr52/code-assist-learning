@@ -50,3 +50,24 @@ def test_create_generic_fallback_practice_session():
     assert payload["library"] == "pandas"
     assert payload["topic"] == "select-columns"
     assert payload["blocks"][0]["code"] == "import pandas as pd"
+
+
+def test_pandas_advanced_fallback_matches_selected_topic():
+    response = client.post(
+        "/api/practice-sessions",
+        json={
+            "language": "python",
+            "library": "pandas",
+            "topic": "rolling-window",
+            "difficulty": "advanced",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    all_code = "\n".join(block["code"] for block in payload["blocks"])
+    assert payload["source"] == "fallback"
+    assert payload["library"] == "pandas"
+    assert payload["topic"] == "rolling-window"
+    assert payload["difficulty"] == "advanced"
+    assert "rolling" in all_code
+    assert "DataFrame({\"name\"" not in all_code
