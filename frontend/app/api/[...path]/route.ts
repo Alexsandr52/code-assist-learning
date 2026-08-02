@@ -35,6 +35,24 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const url = new URL(request.url);
   const target = `${BACKEND_URL}/api/${path.join("/")}${url.search}`;
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
+  const bodyLength = body?.length ?? 0;
+
+  if (request.method !== "GET" && request.method !== "HEAD" && bodyLength === 0) {
+    console.error("Backend proxy received an empty request body", {
+      method: request.method,
+      target,
+      path
+    });
+    return NextResponse.json({ detail: "Frontend sent an empty request body" }, { status: 400 });
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    console.info("Backend proxy forwarding request body", {
+      method: request.method,
+      target,
+      bodyLength
+    });
+  }
 
   try {
     const response = await fetchBackend(target, {

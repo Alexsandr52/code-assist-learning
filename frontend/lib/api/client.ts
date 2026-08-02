@@ -33,10 +33,16 @@ export async function createPracticeSession(input: {
   difficulty: Difficulty;
   anonymousSessionId: string;
 }): Promise<PracticeSession> {
+  assertPracticeSessionInput(input);
+  const body = JSON.stringify(input);
+  console.info("Sending practice session request", {
+    bodyLength: body.length,
+    input
+  });
   return request<PracticeSession>("/api/practice-sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input)
+    body
   });
 }
 
@@ -86,5 +92,17 @@ async function readErrorDetail(response: Response): Promise<string | undefined> 
     return text || undefined;
   } catch {
     return undefined;
+  }
+}
+
+function assertPracticeSessionInput(input: {
+  language: string;
+  library: string;
+  topic: string;
+  difficulty: Difficulty;
+  anonymousSessionId: string;
+}): void {
+  if (!input.language || !input.library || !input.topic || !input.difficulty || !input.anonymousSessionId) {
+    throw new ApiError("Practice session request is incomplete", 400, "Фронтенд сформировал неполный запрос на создание урока.");
   }
 }
