@@ -116,6 +116,12 @@ export function PracticeApp() {
           return;
         }
         setTopics(items);
+        setTopic((currentTopic) => {
+          if (items.length === 0) {
+            return "";
+          }
+          return items.some((item) => item.slug === currentTopic) ? currentTopic : items[0].slug;
+        });
         setCatalogNotice("");
       })
       .catch(() => {
@@ -177,19 +183,27 @@ export function PracticeApp() {
     () => topics.find((item) => item.slug === topic && item.library === library && item.difficulty === difficulty) ?? null,
     [difficulty, library, topic, topics]
   );
-  const isStartDisabled = isLoading || !selectedTopic;
+  const fallbackTopic = useMemo(
+    () => topics.find((item) => item.library === library && item.difficulty === difficulty) ?? null,
+    [difficulty, library, topics]
+  );
+  const topicForStart = selectedTopic ?? fallbackTopic;
+  const isStartDisabled = isLoading || !topicForStart;
 
   async function startPractice() {
-    if (!selectedTopic) {
+    if (!topicForStart) {
       setNotice(isCatalogLoading ? "Темы загружаются, подождите несколько секунд." : "Выберите тему перед стартом практики.");
       return;
+    }
+    if (topic !== topicForStart.slug) {
+      setTopic(topicForStart.slug);
     }
     setIsLoading(true);
     setNotice("Запрос на создание урока отправлен...");
     const practiceRequest = {
       language,
       library,
-      topic: selectedTopic.slug,
+      topic: topicForStart.slug,
       difficulty,
       anonymousSessionId: getAnonymousSessionId()
     };
