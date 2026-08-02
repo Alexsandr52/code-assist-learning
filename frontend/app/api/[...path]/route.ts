@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8000";
+const BACKEND_PROXY_ATTEMPTS = 5;
+const BACKEND_PROXY_RETRY_DELAY_MS = 500;
 
 type RouteContext = {
   params: Promise<{
@@ -35,7 +37,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
 
   try {
-    const response = await fetch(target, {
+    const response = await fetchBackend(target, {
       method: request.method,
       headers: {
         "content-type": request.headers.get("content-type") ?? "application/json"
@@ -67,4 +69,30 @@ async function proxy(request: NextRequest, context: RouteContext) {
     });
     return NextResponse.json({ detail: "Backend is unavailable" }, { status: 502 });
   }
+}
+
+async function fetchBackend(target: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= BACKEND_PROXY_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetch(target, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt === BACKEND_PROXY_ATTEMPTS) {
+        break;
+      }
+      console.warn("Backend proxy request failed; retrying", {
+        target,
+        attempt,
+        nextAttemptInMs: BACKEND_PROXY_RETRY_DELAY_MS,
+        error
+      });
+      await sleep(BACKEND_PROXY_RETRY_DELAY_MS);
+    }
+  }
+  throw lastError;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
