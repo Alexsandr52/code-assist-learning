@@ -1,7 +1,7 @@
 import type { Difficulty, Language, Library, PracticeSession, Topic } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-const REQUEST_TIMEOUT_MS = 25000;
+const REQUEST_TIMEOUT_MS = 70000;
 
 export class ApiError extends Error {
   constructor(

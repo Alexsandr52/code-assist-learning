@@ -27,6 +27,8 @@ class YandexGPTClient:
             "You generate safe Python typing practice content. "
             "Write block titles, explanations, exercise descriptions, hints, and surrounding educational text in Russian. "
             "Keep Python code, package names, identifiers, strings, and URLs technically correct. "
+            "Python code fields must be ASCII-only: no Cyrillic identifiers, comments, or string literals inside code, starterCode, or solution. "
+            "Each code block must be short, valid Python syntax, and no longer than 12 lines or 600 characters. "
             "For the same topic, use the provided variantSeed to create a distinct lesson: choose different variable names, data examples, API parameters, and exercise framing. "
             "Do not reuse the most obvious import/request/print-only sequence unless the topic requires it. "
             "Return only strict JSON matching the requested schema. Do not include markdown. "
@@ -45,6 +47,12 @@ class YandexGPTClient:
                 "Keep the selected topic unchanged, but make this variant noticeably different from a default tutorial example.",
                 "Use short realistic code snippets suitable for manual typing.",
                 "Prefer one coherent mini-scenario across all blocks instead of unrelated fragments.",
+            ],
+            "validationRules": [
+                "Return exactly the requested language, library, topic, and difficulty values.",
+                "Use ASCII-only Python code in blocks.code, exercise.starterCode, and exercise.solution.",
+                "Do not put Russian words inside Python comments, variable names, or string literals.",
+                "Keep every code snippet syntactically valid when parsed on its own.",
             ],
             "schema": {
                 "language": "python",

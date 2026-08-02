@@ -39,3 +39,33 @@ def test_generic_fallback_is_not_cached():
     assert source == "fallback"
     assert content.topic == "rolling-window"
     assert fake_redis.setex_calls == []
+
+
+def test_generation_budget_uses_settings_timeout():
+    settings = Settings(
+        database_url=None,
+        redis_url=None,
+        yandex_gpt_timeout_seconds=7,
+        generation_response_budget_seconds=45,
+    )
+    service = ContentService(settings=settings, db=None)
+    payload = PracticeSessionCreate(
+        language="python",
+        library="pandas",
+        topic="rolling-window",
+        difficulty="advanced",
+    )
+
+    assert service._generation_timeout_seconds() == 7
+
+
+def test_generation_budget_uses_response_budget_when_lower():
+    settings = Settings(
+        database_url=None,
+        redis_url=None,
+        yandex_gpt_timeout_seconds=60,
+        generation_response_budget_seconds=30,
+    )
+    service = ContentService(settings=settings, db=None)
+
+    assert service._generation_timeout_seconds() == 30

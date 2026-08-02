@@ -29,7 +29,6 @@ class PracticeSessionStore:
 session_store = PracticeSessionStore()
 
 AUTO_VARIANT_COUNT = 24
-GENERATION_RESPONSE_BUDGET_SECONDS = 12
 
 
 class ContentService:
@@ -110,7 +109,7 @@ class ContentService:
         cache_key: str,
         variant: int,
     ) -> LearningContentPayload | None:
-        timeout_seconds = min(self.settings.yandex_gpt_timeout_seconds, GENERATION_RESPONSE_BUDGET_SECONDS)
+        timeout_seconds = self._generation_timeout_seconds()
         try:
             started_at = time.perf_counter()
             return await asyncio.wait_for(self._try_generate(payload, cache_key, variant), timeout=timeout_seconds)
@@ -125,6 +124,9 @@ class ContentService:
                 time.perf_counter() - started_at,
             )
             return None
+
+    def _generation_timeout_seconds(self) -> float:
+        return min(self.settings.yandex_gpt_timeout_seconds, self.settings.generation_response_budget_seconds)
 
     async def _try_generate(self, payload: PracticeSessionCreate, cache_key: str, variant: int) -> LearningContentPayload | None:
         lock_key = f"lock:{cache_key}"
@@ -149,7 +151,7 @@ class ContentService:
                             "library": payload.library,
                             "topic": payload.topic,
                             "difficulty": payload.difficulty,
-                            "numberOfBlocks": 5,
+                            "numberOfBlocks": 4,
                             "variant": variant,
                             "variantSeed": f"{payload.language}:{payload.library}:{payload.topic}:{payload.difficulty}:v{variant}:{secrets.token_hex(4)}",
                         }
