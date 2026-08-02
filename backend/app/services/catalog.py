@@ -2,7 +2,10 @@ from app.schemas.catalog import LanguageOut, LibraryOut, TopicOut
 from app.schemas.content import Difficulty
 
 
-LANGUAGES = [LanguageOut(id="lang_python", name="Python", slug="python")]
+LANGUAGES = [
+    LanguageOut(id="lang_python", name="Python", slug="python"),
+    LanguageOut(id="lang_terminal", name="Terminal", slug="terminal"),
+]
 
 LIBRARIES = [
     LibraryOut(id="lib_requests", language="python", name="requests", slug="requests", description="HTTP-запросы."),
@@ -12,6 +15,11 @@ LIBRARIES = [
     LibraryOut(id="lib_bs4", language="python", name="BeautifulSoup", slug="beautifulsoup", description="Парсинг HTML."),
     LibraryOut(id="lib_matplotlib", language="python", name="matplotlib", slug="matplotlib", description="Графики."),
     LibraryOut(id="lib_sqlalchemy", language="python", name="SQLAlchemy", slug="sqlalchemy", description="ORM и SQL."),
+    LibraryOut(id="lib_re", language="python", name="re", slug="re", description="Регулярные выражения."),
+    LibraryOut(id="lib_linux", language="terminal", name="Linux", slug="linux", description="Базовые команды, файлы, процессы и диагностика."),
+    LibraryOut(id="lib_git", language="terminal", name="Git", slug="git", description="Контроль версий в терминале."),
+    LibraryOut(id="lib_conda", language="terminal", name="Conda", slug="conda", description="Окружения и зависимости Python-проектов."),
+    LibraryOut(id="lib_docker", language="terminal", name="Docker", slug="docker", description="Контейнеры, образы и Docker Compose."),
 ]
 
 TOPICS = [
@@ -86,6 +94,30 @@ TOPICS = [
     TopicOut(id="topic_sqlalchemy_joins_advanced", library="sqlalchemy", name="JOIN-запросы", slug="joins", difficulty="advanced"),
     TopicOut(id="topic_sqlalchemy_transactions_advanced", library="sqlalchemy", name="Транзакции", slug="transactions", difficulty="advanced"),
     TopicOut(id="topic_sqlalchemy_async_advanced", library="sqlalchemy", name="Async SQLAlchemy", slug="async-sqlalchemy", difficulty="advanced"),
+    TopicOut(id="topic_re_functions_beginner", library="re", name="Выбор функции re", slug="regex-functions", difficulty="beginner"),
+    TopicOut(id="topic_re_classes_beginner", library="re", name="Символьные классы", slug="character-classes", difficulty="beginner"),
+    TopicOut(id="topic_re_quantifiers_beginner", library="re", name="Квантификаторы", slug="quantifiers", difficulty="beginner"),
+    TopicOut(id="topic_re_anchors_beginner", library="re", name="Якоря и границы слов", slug="anchors-boundaries", difficulty="beginner"),
+    TopicOut(id="topic_re_groups_intermediate", library="re", name="Группы и извлечение", slug="groups-extraction", difficulty="intermediate"),
+    TopicOut(id="topic_re_iteration_intermediate", library="re", name="findall и finditer", slug="findall-finditer", difficulty="intermediate"),
+    TopicOut(id="topic_re_split_sub_intermediate", library="re", name="split и sub", slug="split-sub", difficulty="intermediate"),
+    TopicOut(id="topic_re_flags_intermediate", library="re", name="Флаги поиска", slug="flags", difficulty="intermediate"),
+    TopicOut(id="topic_re_named_advanced", library="re", name="Именованные группы", slug="named-groups", difficulty="advanced"),
+    TopicOut(id="topic_re_backrefs_advanced", library="re", name="Обратные ссылки", slug="backreferences", difficulty="advanced"),
+    TopicOut(id="topic_re_logs_advanced", library="re", name="Парсинг логов", slug="log-parsing", difficulty="advanced"),
+    TopicOut(id="topic_re_cleanup_advanced", library="re", name="Очистка и преобразование", slug="cleanup-pipelines", difficulty="advanced"),
+    TopicOut(id="topic_linux_basics_beginner", library="linux", name="Основы Linux", slug="linux-basics", difficulty="beginner"),
+    TopicOut(id="topic_linux_pipes_intermediate", library="linux", name="Pipes, grep и перенаправления", slug="pipes-grep-redirection", difficulty="intermediate"),
+    TopicOut(id="topic_linux_diagnostics_advanced", library="linux", name="Диагностика системы", slug="system-diagnostics", difficulty="advanced"),
+    TopicOut(id="topic_git_basics_beginner", library="git", name="Git: базовый цикл", slug="git-basics", difficulty="beginner"),
+    TopicOut(id="topic_git_branches_intermediate", library="git", name="Git: ветки и синхронизация", slug="git-branches-remotes", difficulty="intermediate"),
+    TopicOut(id="topic_git_history_advanced", library="git", name="Git: история и восстановление", slug="git-history-recovery", difficulty="advanced"),
+    TopicOut(id="topic_conda_basics_beginner", library="conda", name="Conda: основы", slug="conda-basics", difficulty="beginner"),
+    TopicOut(id="topic_conda_envs_intermediate", library="conda", name="Conda: окружения проекта", slug="conda-project-envs", difficulty="intermediate"),
+    TopicOut(id="topic_conda_repro_advanced", library="conda", name="Conda: воспроизводимость", slug="conda-reproducibility", difficulty="advanced"),
+    TopicOut(id="topic_docker_basics_beginner", library="docker", name="Docker: основы", slug="docker-basics", difficulty="beginner"),
+    TopicOut(id="topic_docker_compose_intermediate", library="docker", name="Docker Compose", slug="docker-compose", difficulty="intermediate"),
+    TopicOut(id="topic_docker_debug_advanced", library="docker", name="Docker: отладка и сборка", slug="docker-debug-build", difficulty="advanced"),
 ]
 
 

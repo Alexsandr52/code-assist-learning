@@ -29,6 +29,7 @@ class PracticeSessionStore:
 session_store = PracticeSessionStore()
 
 AUTO_VARIANT_COUNT = 24
+TERMINAL_LIBRARIES = {"linux", "git", "conda", "docker"}
 
 
 class ContentService:
@@ -89,6 +90,11 @@ class ContentService:
             self._write_cache(cache_key, fallback)
             logger.info("Content file fallback hit: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
             return fallback, "fallback"
+
+        if payload.library in TERMINAL_LIBRARIES:
+            terminal_fallback = self._build_generic_fallback(payload)
+            logger.info("Content terminal fallback used: key=%s elapsed=%.3fs", cache_key, time.perf_counter() - started_at)
+            return terminal_fallback, "fallback"
 
         if self._generation_configured():
             logger.info("Generating content via model: key=%s variant=%s", cache_key, variant)
@@ -286,6 +292,10 @@ class ContentService:
     def _generic_snippets(self, library: str, topic: str, difficulty: str) -> dict[str, Any]:
         if library == "pandas":
             return self._pandas_snippets(topic, difficulty)
+        if library == "re":
+            return self._re_snippets(topic, difficulty)
+        if library in TERMINAL_LIBRARIES:
+            return self._terminal_snippets(library, topic, difficulty)
 
         snippets_by_library: dict[str, dict[str, Any]] = {
             "numpy": {
@@ -503,3 +513,339 @@ class ContentService:
         }
 
         return snippets_by_topic.get(topic) or snippets_by_topic.get(difficulty) or snippets_by_topic["dataframes"]
+
+    def _re_snippets(self, topic: str, difficulty: str) -> dict[str, Any]:
+        snippets_by_topic: dict[str, dict[str, Any]] = {
+            "regex-functions": {
+                "blocks": [
+                    {"title": "search", "code": "import re\nline = \"INFO user=alice action=login\"\nmatch = re.search(r\"user=\\w+\", line)", "explanation": "search находит фрагмент в любой части строки."},
+                    {"title": "fullmatch", "code": "email = \"ops@example.com\"\nis_valid = re.fullmatch(r\"[\\w.-]+@[\\w.-]+\", email) is not None", "explanation": "fullmatch проверяет, что вся строка соответствует шаблону."},
+                    {"title": "findall", "code": "text = \"ids: 42, 108, 204\"\nids = re.findall(r\"\\d+\", text)\nprint(ids)", "explanation": "findall возвращает все найденные совпадения списком."},
+                ],
+                "exercise": {
+                    "description": "Выберите подходящие функции: найдите status в строке лога, проверьте весь код заявки и извлеките все числа.",
+                    "starterCode": "import re\n\nline = \"ERROR status=500 request=abc-42\"\ncode = \"REQ-2048\"\ntext = \"latency 120 ms, retry 2\"\n",
+                    "hint": "Для фрагмента используйте search, для полной проверки fullmatch, для всех чисел findall.",
+                    "solution": "import re\n\nline = \"ERROR status=500 request=abc-42\"\ncode = \"REQ-2048\"\ntext = \"latency 120 ms, retry 2\"\nstatus = re.search(r\"status=\\d+\", line)\nis_code = re.fullmatch(r\"REQ-\\d+\", code) is not None\nnumbers = re.findall(r\"\\d+\", text)\nprint(status.group(), is_code, numbers)",
+                },
+            },
+            "character-classes": {
+                "blocks": [
+                    {"title": "Цифры", "code": "import re\ntext = \"order A17 costs 450\"\nvalues = re.findall(r\"\\d+\", text)", "explanation": "\\d находит цифровые последовательности."},
+                    {"title": "Слова", "code": "slug = \"user_profile_2026\"\nparts = re.findall(r\"\\w+\", slug)\nprint(parts)", "explanation": "\\w подходит для букв, цифр и подчёркивания."},
+                    {"title": "Пробелы", "code": "raw = \"name   email\\tstatus\"\ncolumns = re.split(r\"\\s+\", raw)\nprint(columns)", "explanation": "\\s помогает разбивать текст по любым пробельным символам."},
+                ],
+                "exercise": {
+                    "description": "Извлеките код товара, число и домен из строки заказа.",
+                    "starterCode": "import re\n\nline = \"item=BK-204 qty=12 email=ops@example.com\"\n",
+                    "hint": "Комбинируйте \\w, \\d и явные символы вроде дефиса и точки.",
+                    "solution": "import re\n\nline = \"item=BK-204 qty=12 email=ops@example.com\"\nitem = re.search(r\"item=[\\w-]+\", line).group()\nqty = re.search(r\"qty=\\d+\", line).group()\ndomain = re.search(r\"@[\\w.-]+\", line).group()\nprint(item, qty, domain)",
+                },
+            },
+            "quantifiers": {
+                "blocks": [
+                    {"title": "Один или больше", "code": "import re\nline = \"disk usage 95 percent\"\nnumber = re.search(r\"\\d+\", line).group()", "explanation": "+ требует минимум одно повторение."},
+                    {"title": "Необязательная часть", "code": "codes = [\"color\", \"colour\"]\nchecks = [re.fullmatch(r\"colou?r\", code) for code in codes]", "explanation": "? делает предыдущий символ необязательным."},
+                    {"title": "Диапазон", "code": "pin = \"4921\"\nis_pin = re.fullmatch(r\"\\d{4,6}\", pin) is not None\nprint(is_pin)", "explanation": "{n,m} задаёт допустимое число повторений."},
+                ],
+                "exercise": {
+                    "description": "Проверьте id пользователя, где префикс usr- обязателен, а число содержит от 3 до 5 цифр.",
+                    "starterCode": "import re\n\nvalue = \"usr-1042\"\n",
+                    "hint": "Используйте fullmatch и квантификатор {3,5}.",
+                    "solution": "import re\n\nvalue = \"usr-1042\"\nis_user_id = re.fullmatch(r\"usr-\\d{3,5}\", value) is not None\nprint(is_user_id)",
+                },
+            },
+            "anchors-boundaries": {
+                "blocks": [
+                    {"title": "Начало строки", "code": "import re\nline = \"ERROR payment failed\"\nis_error = re.search(r\"^ERROR\", line) is not None", "explanation": "^ проверяет начало строки."},
+                    {"title": "Конец строки", "code": "path = \"/var/log/app.log\"\nis_log = re.search(r\"\\.log$\", path) is not None", "explanation": "$ проверяет конец строки."},
+                    {"title": "Граница слова", "code": "text = \"cat scatter category\"\nwords = re.findall(r\"\\bcat\\b\", text)\nprint(words)", "explanation": "\\b не даёт найти cat внутри другого слова."},
+                ],
+                "exercise": {
+                    "description": "Проверьте, что строка начинается с WARN и заканчивается числовым кодом.",
+                    "starterCode": "import re\n\nline = \"WARN retry finished 204\"\n",
+                    "hint": "Соедините ^, \\d+ и $ в одном шаблоне.",
+                    "solution": "import re\n\nline = \"WARN retry finished 204\"\nmatched = re.search(r\"^WARN.*\\d+$\", line) is not None\nprint(matched)",
+                },
+            },
+            "groups-extraction": {
+                "blocks": [
+                    {"title": "Группы", "code": "import re\nline = \"user=alice id=42\"\nmatch = re.search(r\"user=(\\w+) id=(\\d+)\", line)", "explanation": "Скобки сохраняют части совпадения для извлечения."},
+                    {"title": "group", "code": "name = match.group(1)\nuser_id = int(match.group(2))\nprint(name, user_id)", "explanation": "group(1) и group(2) возвращают найденные подстроки."},
+                    {"title": "Несколько строк", "code": "rows = [\"cpu=91%\", \"mem=74%\"]\nvalues = [re.search(r\"(\\w+)=(\\d+)%\", row).groups() for row in rows]", "explanation": "groups возвращает кортеж всех захваченных групп."},
+                ],
+                "exercise": {
+                    "description": "Извлеките метод, путь и статус из строки HTTP-лога.",
+                    "starterCode": "import re\n\nline = \"GET /api/users 200\"\n",
+                    "hint": "Метод состоит из заглавных букв, статус из цифр.",
+                    "solution": "import re\n\nline = \"GET /api/users 200\"\nmatch = re.search(r\"([A-Z]+)\\s+([^\\s]+)\\s+(\\d+)\", line)\nmethod, path, status = match.groups()\nprint(method, path, int(status))",
+                },
+            },
+            "findall-finditer": {
+                "blocks": [
+                    {"title": "findall", "code": "import re\ntext = \"user=alice user=bob user=carol\"\nusers = re.findall(r\"user=(\\w+)\", text)", "explanation": "findall удобен, когда нужны только значения."},
+                    {"title": "finditer", "code": "line = \"10ms 25ms 80ms\"\nfor match in re.finditer(r\"\\d+ms\", line):\n    print(match.group(), match.start())", "explanation": "finditer даёт объект match и позиции совпадения."},
+                    {"title": "Пары", "code": "query = \"page=2&limit=50\"\npairs = re.findall(r\"(\\w+)=(\\d+)\", query)\nprint(dict(pairs))", "explanation": "Группы в findall возвращаются кортежами."},
+                ],
+                "exercise": {
+                    "description": "Соберите все request_id из текста и напечатайте их позиции.",
+                    "starterCode": "import re\n\ntext = \"request_id=ab12 ok request_id=cd34 failed\"\n",
+                    "hint": "Для значений хватит findall, для позиций нужен finditer.",
+                    "solution": "import re\n\ntext = \"request_id=ab12 ok request_id=cd34 failed\"\nids = re.findall(r\"request_id=(\\w+)\", text)\npositions = [match.start() for match in re.finditer(r\"request_id=\\w+\", text)]\nprint(ids, positions)",
+                },
+            },
+            "split-sub": {
+                "blocks": [
+                    {"title": "split", "code": "import re\nraw = \"alice, bob;carol  dave\"\nnames = re.split(r\"[,;\\s]+\", raw)", "explanation": "split с регулярным выражением разбивает по разным разделителям."},
+                    {"title": "sub", "code": "phone = \"+1 (555) 010-2040\"\ndigits = re.sub(r\"\\D+\", \"\", phone)\nprint(digits)", "explanation": "sub заменяет все нецифровые фрагменты пустой строкой."},
+                    {"title": "Очистка", "code": "title = \"  API---Gateway   Errors \"\nslug = re.sub(r\"\\W+\", \"-\", title.strip().lower())", "explanation": "sub помогает нормализовать текстовые поля."},
+                ],
+                "exercise": {
+                    "description": "Разбейте строку тегов и нормализуйте телефон до одних цифр.",
+                    "starterCode": "import re\n\ntags = \"error, api; retry  timeout\"\nphone = \"+7 (999) 123-45-67\"\n",
+                    "hint": "Для тегов используйте split по запятым, точкам с запятой и пробелам; для телефона замените \\D+.",
+                    "solution": "import re\n\ntags = \"error, api; retry  timeout\"\nphone = \"+7 (999) 123-45-67\"\nclean_tags = [tag for tag in re.split(r\"[,;\\s]+\", tags) if tag]\ndigits = re.sub(r\"\\D+\", \"\", phone)\nprint(clean_tags, digits)",
+                },
+            },
+            "flags": {
+                "blocks": [
+                    {"title": "IGNORECASE", "code": "import re\ntext = \"Error: timeout\"\nfound = re.search(r\"error\", text, re.IGNORECASE) is not None", "explanation": "IGNORECASE отключает зависимость от регистра."},
+                    {"title": "MULTILINE", "code": "log = \"INFO start\\nERROR fail\"\nerrors = re.findall(r\"^ERROR.*\", log, re.MULTILINE)", "explanation": "MULTILINE позволяет ^ и $ работать на каждой строке."},
+                    {"title": "DOTALL", "code": "html = \"<pre>first\\nsecond</pre>\"\nbody = re.search(r\"<pre>.*</pre>\", html, re.DOTALL).group()", "explanation": "DOTALL позволяет точке захватывать перевод строки."},
+                ],
+                "exercise": {
+                    "description": "Найдите все строки с error в многострочном логе независимо от регистра.",
+                    "starterCode": "import re\n\nlog = \"info start\\nERROR failed\\nwarning retry\\nerror timeout\"\n",
+                    "hint": "Объедините IGNORECASE и MULTILINE через оператор |.",
+                    "solution": "import re\n\nlog = \"info start\\nERROR failed\\nwarning retry\\nerror timeout\"\nerrors = re.findall(r\"^error.*\", log, re.IGNORECASE | re.MULTILINE)\nprint(errors)",
+                },
+            },
+            "named-groups": {
+                "blocks": [
+                    {"title": "Имена групп", "code": "import re\nline = \"2026-08-02 ERROR payment\"\npattern = r\"(?P<date>\\d{4}-\\d{2}-\\d{2}) (?P<level>\\w+) (?P<msg>.*)\"", "explanation": "Именованные группы делают шаблон самодокументируемым."},
+                    {"title": "groupdict", "code": "match = re.search(pattern, line)\nrecord = match.groupdict()\nprint(record[\"level\"])", "explanation": "groupdict возвращает словарь с именами групп."},
+                    {"title": "Типизация", "code": "record[\"status\"] = \"500\"\nstatus = int(record[\"status\"])", "explanation": "После извлечения строки можно привести к нужному типу."},
+                ],
+                "exercise": {
+                    "description": "Разберите access-log на ip, method, path и status через именованные группы.",
+                    "starterCode": "import re\n\nline = \"10.0.0.5 POST /api/orders 201\"\n",
+                    "hint": "Используйте (?P<name>...) для каждой части строки.",
+                    "solution": "import re\n\nline = \"10.0.0.5 POST /api/orders 201\"\npattern = r\"(?P<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) (?P<method>[A-Z]+) (?P<path>\\S+) (?P<status>\\d+)\"\nrecord = re.search(pattern, line).groupdict()\nrecord[\"status\"] = int(record[\"status\"])\nprint(record)",
+                },
+            },
+            "backreferences": {
+                "blocks": [
+                    {"title": "Дубли слов", "code": "import re\ntext = \"retry retry failed\"\nmatch = re.search(r\"\\b(\\w+)\\s+\\1\\b\", text)", "explanation": "\\1 ссылается на текст, найденный первой группой."},
+                    {"title": "Повтор id", "code": "line = \"id=42 previous=42\"\nsame = re.search(r\"id=(\\d+) previous=\\1\", line) is not None", "explanation": "Обратная ссылка проверяет повтор того же значения."},
+                    {"title": "sub с группами", "code": "date = \"2026-08-02\"\npretty = re.sub(r\"(\\d{4})-(\\d{2})-(\\d{2})\", r\"\\3.\\2.\\1\", date)", "explanation": "В замене можно переставлять найденные группы."},
+                ],
+                "exercise": {
+                    "description": "Найдите повторяющийся код ошибки и преобразуйте дату из YYYY-MM-DD в DD/MM/YYYY.",
+                    "starterCode": "import re\n\nline = \"error=E42 retry=E42 date=2026-08-02\"\n",
+                    "hint": "Для повторяющегося кода используйте \\1, для даты re.sub с тремя группами.",
+                    "solution": "import re\n\nline = \"error=E42 retry=E42 date=2026-08-02\"\nhas_same_code = re.search(r\"error=(E\\d+) retry=\\1\", line) is not None\nconverted = re.sub(r\"(\\d{4})-(\\d{2})-(\\d{2})\", r\"\\3/\\2/\\1\", line)\nprint(has_same_code, converted)",
+                },
+            },
+            "log-parsing": {
+                "blocks": [
+                    {"title": "Шаблон", "code": "import re\npattern = re.compile(r\"^(?P<ts>\\S+) (?P<level>\\w+) user=(?P<user>\\w+) status=(?P<status>\\d+)$\")", "explanation": "compile удобно использовать для повторного парсинга строк."},
+                    {"title": "Одна строка", "code": "line = \"2026-08-02T10:15:00 ERROR user=alice status=500\"\nrecord = pattern.search(line).groupdict()", "explanation": "Именованные группы превращают лог в словарь."},
+                    {"title": "Фильтр", "code": "record[\"status\"] = int(record[\"status\"])\nis_error = record[\"status\"] >= 500\nprint(is_error)", "explanation": "После парсинга можно фильтровать записи по числовым полям."},
+                ],
+                "exercise": {
+                    "description": "Разберите несколько строк лога и оставьте только статусы 500 и выше.",
+                    "starterCode": "import re\n\nlines = [\"10:00 INFO user=bob status=200\", \"10:01 ERROR user=alice status=503\"]\n",
+                    "hint": "Скомпилируйте шаблон с named groups, затем преобразуйте status в int.",
+                    "solution": "import re\n\nlines = [\"10:00 INFO user=bob status=200\", \"10:01 ERROR user=alice status=503\"]\npattern = re.compile(r\"^(?P<time>\\S+) (?P<level>\\w+) user=(?P<user>\\w+) status=(?P<status>\\d+)$\")\nrecords = [pattern.search(line).groupdict() for line in lines]\nerrors = [item for item in records if int(item[\"status\"]) >= 500]\nprint(errors)",
+                },
+            },
+            "cleanup-pipelines": {
+                "blocks": [
+                    {"title": "Пробелы", "code": "import re\nraw = \"  Alice   Smith\\t<alice@example.com>  \"\ntext = re.sub(r\"\\s+\", \" \", raw.strip())", "explanation": "Первый шаг нормализует пробельные символы."},
+                    {"title": "Извлечение email", "code": "email = re.search(r\"[\\w.-]+@[\\w.-]+\", text).group()\nname = re.sub(r\"\\s*<.*>$\", \"\", text)", "explanation": "Можно сочетать извлечение и удаление лишнего хвоста."},
+                    {"title": "Slug", "code": "slug = re.sub(r\"[^a-z0-9]+\", \"-\", name.lower()).strip(\"-\")\nprint(slug, email)", "explanation": "Финальный sub приводит имя к машинному формату."},
+                ],
+                "exercise": {
+                    "description": "Очистите контакт: нормализуйте пробелы, извлеките email и создайте slug из имени.",
+                    "starterCode": "import re\n\nraw = \"  Bob   Stone   <bob.stone@example.com> \"\n",
+                    "hint": "Сначала strip и \\s+, затем search для email и sub для slug.",
+                    "solution": "import re\n\nraw = \"  Bob   Stone   <bob.stone@example.com> \"\ntext = re.sub(r\"\\s+\", \" \", raw.strip())\nemail = re.search(r\"[\\w.-]+@[\\w.-]+\", text).group()\nname = re.sub(r\"\\s*<.*>$\", \"\", text)\nslug = re.sub(r\"[^a-z0-9]+\", \"-\", name.lower()).strip(\"-\")\nprint(email, slug)",
+                },
+            },
+        }
+
+        fallback_by_difficulty = {
+            "beginner": "regex-functions",
+            "intermediate": "groups-extraction",
+            "advanced": "log-parsing",
+        }
+        return snippets_by_topic.get(topic) or snippets_by_topic[fallback_by_difficulty.get(difficulty, "regex-functions")]
+
+    def _terminal_snippets(self, library: str, topic: str, difficulty: str) -> dict[str, Any]:
+        snippets_by_topic: dict[str, dict[str, Any]] = {
+            "linux-basics": {
+                "blocks": [
+                    {"title": "Где я", "code": "pwd\nls -la", "explanation": "pwd показывает текущую директорию, ls -la выводит подробный список файлов."},
+                    {"title": "Переходы", "code": "cd ~/projects\nmkdir logs\ncd logs", "explanation": "cd меняет директорию, mkdir создаёт папку для рабочих файлов."},
+                    {"title": "Просмотр", "code": "cat app.log\nhead -20 app.log\ntail -20 app.log", "explanation": "cat, head и tail помогают быстро посмотреть содержимое файла."},
+                ],
+                "exercise": {
+                    "description": "Создайте папку reports, перейдите в неё и посмотрите первые строки файла access.log.",
+                    "starterCode": "pwd\n",
+                    "hint": "Нужны mkdir, cd и head.",
+                    "solution": "pwd\nmkdir reports\ncd reports\nhead -20 access.log",
+                },
+            },
+            "pipes-grep-redirection": {
+                "blocks": [
+                    {"title": "grep", "code": "grep \"ERROR\" app.log\ngrep -n \"timeout\" app.log", "explanation": "grep ищет строки, -n добавляет номера строк."},
+                    {"title": "pipe", "code": "cat app.log | grep \"ERROR\" | head -10", "explanation": "pipe передаёт вывод одной команды на вход следующей."},
+                    {"title": "redirect", "code": "grep \"ERROR\" app.log > errors.log\nwc -l errors.log", "explanation": "> сохраняет результат в файл, wc -l считает строки."},
+                ],
+                "exercise": {
+                    "description": "Найдите WARN-строки в service.log, сохраните их и посчитайте количество.",
+                    "starterCode": "grep \"WARN\" service.log\n",
+                    "hint": "Используйте > для сохранения и wc -l для подсчёта.",
+                    "solution": "grep \"WARN\" service.log > warnings.log\nwc -l warnings.log\nhead -5 warnings.log",
+                },
+            },
+            "system-diagnostics": {
+                "blocks": [
+                    {"title": "Процессы", "code": "ps aux | grep \"uvicorn\"\npgrep -fl \"python\"", "explanation": "ps и pgrep помогают найти запущенные процессы по имени."},
+                    {"title": "Диск", "code": "df -h\ndu -sh logs", "explanation": "df показывает свободное место, du оценивает размер директории."},
+                    {"title": "Сеть", "code": "curl -I http://127.0.0.1:8000/health\nss -ltn", "explanation": "curl проверяет HTTP-ответ, ss показывает слушающие TCP-порты."},
+                ],
+                "exercise": {
+                    "description": "Проверьте место на диске, найдите python-процессы и убедитесь, что health endpoint отвечает.",
+                    "starterCode": "df -h\n",
+                    "hint": "Комбинируйте df, pgrep и curl -I.",
+                    "solution": "df -h\npgrep -fl \"python\"\ncurl -I http://127.0.0.1:8000/health",
+                },
+            },
+            "git-basics": {
+                "blocks": [
+                    {"title": "Статус", "code": "git status\ngit diff -- README.md", "explanation": "status показывает состояние рабочей копии, diff показывает изменения."},
+                    {"title": "Индекс", "code": "git add README.md\ngit status --short", "explanation": "git add переносит выбранный файл в индекс."},
+                    {"title": "Коммит", "code": "git commit -m \"docs: update readme\"\ngit log --oneline -5", "explanation": "commit фиксирует индекс, log показывает последние коммиты."},
+                ],
+                "exercise": {
+                    "description": "Проверьте изменения, добавьте файл notes.md и создайте короткий коммит.",
+                    "starterCode": "git status --short\n",
+                    "hint": "Последовательность: status, diff, add, commit.",
+                    "solution": "git status --short\ngit diff -- notes.md\ngit add notes.md\ngit commit -m \"docs: update notes\"",
+                },
+            },
+            "git-branches-remotes": {
+                "blocks": [
+                    {"title": "Ветка", "code": "git switch -c feature/terminal-lessons\ngit branch --show-current", "explanation": "switch -c создаёт и сразу включает новую ветку."},
+                    {"title": "Синхронизация", "code": "git fetch origin\ngit status -sb", "explanation": "fetch забирает данные с remote без изменения рабочей ветки."},
+                    {"title": "Публикация", "code": "git push -u origin feature/terminal-lessons", "explanation": "-u связывает локальную ветку с удалённой."},
+                ],
+                "exercise": {
+                    "description": "Создайте ветку feature/git-practice, проверьте upstream и подготовьте push.",
+                    "starterCode": "git fetch origin\n",
+                    "hint": "Нужны switch -c, status -sb и push -u.",
+                    "solution": "git fetch origin\ngit switch -c feature/git-practice\ngit status -sb\ngit push -u origin feature/git-practice",
+                },
+            },
+            "git-history-recovery": {
+                "blocks": [
+                    {"title": "История", "code": "git log --oneline --decorate -10\ngit show --stat HEAD", "explanation": "log и show помогают понять последние изменения."},
+                    {"title": "Поиск", "code": "git reflog --date=relative\ngit diff HEAD~1..HEAD", "explanation": "reflog показывает перемещения HEAD, diff сравнивает состояния."},
+                    {"title": "Точный откат файла", "code": "git restore --source=HEAD~1 -- README.md\ngit diff -- README.md", "explanation": "restore для конкретного файла безопаснее полного сброса ветки."},
+                ],
+                "exercise": {
+                    "description": "Найдите последний коммит, посмотрите изменения и восстановите только docs/guide.md из предыдущего коммита.",
+                    "starterCode": "git log --oneline -5\n",
+                    "hint": "Используйте show, diff и restore --source для одного файла.",
+                    "solution": "git log --oneline -5\ngit show --stat HEAD\ngit diff HEAD~1..HEAD -- docs/guide.md\ngit restore --source=HEAD~1 -- docs/guide.md",
+                },
+            },
+            "conda-basics": {
+                "blocks": [
+                    {"title": "Версия", "code": "conda --version\nconda info", "explanation": "Эти команды проверяют установку и базовую конфигурацию conda."},
+                    {"title": "Окружения", "code": "conda env list\nconda activate data-lab", "explanation": "env list показывает окружения, activate включает выбранное."},
+                    {"title": "Пакеты", "code": "conda list\nconda list pandas", "explanation": "conda list показывает установленные пакеты."},
+                ],
+                "exercise": {
+                    "description": "Проверьте conda, найдите окружения и убедитесь, что numpy установлен в активном окружении.",
+                    "starterCode": "conda --version\n",
+                    "hint": "Нужны conda env list и conda list.",
+                    "solution": "conda --version\nconda env list\nconda list numpy",
+                },
+            },
+            "conda-project-envs": {
+                "blocks": [
+                    {"title": "Создание", "code": "conda create -n ml-lab python=3.12\nconda activate ml-lab", "explanation": "create создаёт изолированное окружение с нужной версией Python."},
+                    {"title": "Установка", "code": "conda install pandas scikit-learn\nconda list scikit-learn", "explanation": "install добавляет пакеты в активное окружение."},
+                    {"title": "Экспорт", "code": "conda env export --from-history > environment.yml\ncat environment.yml", "explanation": "--from-history сохраняет явно установленные зависимости."},
+                ],
+                "exercise": {
+                    "description": "Создайте окружение api-lab с Python 3.12, установите fastapi и экспортируйте environment.yml.",
+                    "starterCode": "conda create -n api-lab python=3.12\n",
+                    "hint": "После activate используйте conda install и env export --from-history.",
+                    "solution": "conda create -n api-lab python=3.12\nconda activate api-lab\nconda install fastapi uvicorn\nconda env export --from-history > environment.yml",
+                },
+            },
+            "conda-reproducibility": {
+                "blocks": [
+                    {"title": "Файл окружения", "code": "conda env export --from-history > environment.yml\ngit diff -- environment.yml", "explanation": "environment.yml фиксирует зависимости проекта."},
+                    {"title": "Воссоздание", "code": "conda env create -f environment.yml\nconda activate project-env", "explanation": "env create поднимает окружение из файла."},
+                    {"title": "Обновление", "code": "conda env update -f environment.yml --prune\nconda list", "explanation": "--prune убирает пакеты, которых больше нет в файле."},
+                ],
+                "exercise": {
+                    "description": "Экспортируйте минимальный environment.yml и покажите команды для воссоздания и обновления окружения.",
+                    "starterCode": "conda env export --from-history > environment.yml\n",
+                    "hint": "Нужны env create и env update --prune.",
+                    "solution": "conda env export --from-history > environment.yml\nconda env create -f environment.yml\nconda env update -f environment.yml --prune\nconda list",
+                },
+            },
+            "docker-basics": {
+                "blocks": [
+                    {"title": "Версия", "code": "docker --version\ndocker info", "explanation": "Проверяет клиент Docker и доступность daemon."},
+                    {"title": "Контейнер", "code": "docker run --name web-demo -p 8080:80 nginx:alpine", "explanation": "run создаёт контейнер из образа и публикует порт."},
+                    {"title": "Наблюдение", "code": "docker ps\ndocker logs web-demo", "explanation": "ps показывает контейнеры, logs выводит журнал контейнера."},
+                ],
+                "exercise": {
+                    "description": "Запустите nginx-контейнер с именем docs-web, проверьте список контейнеров и логи.",
+                    "starterCode": "docker --version\n",
+                    "hint": "Используйте docker run --name, затем ps и logs.",
+                    "solution": "docker --version\ndocker run --name docs-web -p 8080:80 nginx:alpine\ndocker ps\ndocker logs docs-web",
+                },
+            },
+            "docker-compose": {
+                "blocks": [
+                    {"title": "Статус", "code": "docker compose ps\ndocker compose config", "explanation": "ps показывает сервисы, config проверяет итоговую конфигурацию compose."},
+                    {"title": "Запуск", "code": "docker compose up -d --build\ndocker compose logs -f backend", "explanation": "up -d запускает сервисы в фоне, logs помогает смотреть backend."},
+                    {"title": "Проверка", "code": "docker compose exec backend python -V\ncurl -I http://127.0.0.1:3000", "explanation": "exec запускает команду внутри сервиса, curl проверяет frontend."},
+                ],
+                "exercise": {
+                    "description": "Пересоберите backend и frontend, проверьте статус сервисов и последние backend-логи.",
+                    "starterCode": "docker compose ps\n",
+                    "hint": "Нужны up -d --build, ps и logs.",
+                    "solution": "docker compose up -d --build backend frontend\ndocker compose ps\ndocker compose logs --tail=80 backend",
+                },
+            },
+            "docker-debug-build": {
+                "blocks": [
+                    {"title": "Слои", "code": "docker build --progress=plain -t cla-backend ./backend", "explanation": "--progress=plain делает лог сборки подробным и пригодным для диагностики."},
+                    {"title": "Inspect", "code": "docker inspect cla-backend\ndocker image history cla-backend", "explanation": "inspect и history помогают разобраться с образом."},
+                    {"title": "Exec", "code": "docker compose exec backend env\ndocker compose exec backend python -m pytest", "explanation": "exec полезен для диагностики окружения внутри контейнера."},
+                ],
+                "exercise": {
+                    "description": "Соберите backend-образ с подробным логом, посмотрите историю образа и проверьте переменные контейнера.",
+                    "starterCode": "docker build --progress=plain -t cla-backend ./backend\n",
+                    "hint": "Добавьте image history и compose exec env.",
+                    "solution": "docker build --progress=plain -t cla-backend ./backend\ndocker image history cla-backend\ndocker compose exec backend env",
+                },
+            },
+        }
+
+        fallback_by_library = {
+            "linux": {"beginner": "linux-basics", "intermediate": "pipes-grep-redirection", "advanced": "system-diagnostics"},
+            "git": {"beginner": "git-basics", "intermediate": "git-branches-remotes", "advanced": "git-history-recovery"},
+            "conda": {"beginner": "conda-basics", "intermediate": "conda-project-envs", "advanced": "conda-reproducibility"},
+            "docker": {"beginner": "docker-basics", "intermediate": "docker-compose", "advanced": "docker-debug-build"},
+        }
+        fallback_topic = fallback_by_library.get(library, {}).get(difficulty, "linux-basics")
+        return snippets_by_topic.get(topic) or snippets_by_topic[fallback_topic]

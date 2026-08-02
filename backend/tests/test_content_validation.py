@@ -67,3 +67,49 @@ def test_rejects_cyrillic_in_code():
     }
     with pytest.raises(ValueError):
         validate_learning_content(raw)
+
+
+def test_accepts_terminal_shell_commands():
+    raw = {
+        **VALID_CONTENT,
+        "language": "terminal",
+        "library": "git",
+        "topic": "git-basics",
+        "blocks": [
+            {"title": "Status", "code": "git status\ngit diff -- README.md", "explanation": "Проверяет изменения."},
+            {"title": "Stage", "code": "git add README.md\ngit status --short", "explanation": "Добавляет файл в индекс."},
+            {"title": "Log", "code": "git log --oneline -5", "explanation": "Показывает историю."},
+        ],
+        "exercise": {
+            "description": "Проверьте статус.",
+            "starterCode": "git status\n",
+            "hint": "Используйте git status.",
+            "solution": "git status\ngit diff -- README.md",
+        },
+    }
+
+    content = validate_learning_content(raw)
+    assert content.language == "terminal"
+
+
+def test_rejects_destructive_shell_commands():
+    raw = {
+        **VALID_CONTENT,
+        "language": "terminal",
+        "library": "linux",
+        "topic": "danger",
+        "blocks": [
+            {"title": "Safe", "code": "pwd", "explanation": "Показывает директорию."},
+            {"title": "Also safe", "code": "ls -la", "explanation": "Показывает файлы."},
+            {"title": "Danger", "code": "rm -rf build", "explanation": "Опасная команда."},
+        ],
+        "exercise": {
+            "description": "Проверьте директорию.",
+            "starterCode": "pwd\n",
+            "hint": "Используйте pwd.",
+            "solution": "pwd",
+        },
+    }
+
+    with pytest.raises(ValueError):
+        validate_learning_content(raw)
