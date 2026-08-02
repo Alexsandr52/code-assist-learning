@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     yandex_gpt_model: str | None = None
     yandex_gpt_timeout_seconds: float = Field(default=20, ge=1, le=60)
     generation_response_budget_seconds: float = Field(default=45, ge=1, le=90)
-    prompt_version: str = "python-library-practice-v4"
+    prompt_version: str = "python-library-practice-v5"
     max_generation_attempts: int = Field(default=3, ge=1, le=5)
     generation_lock_ttl_seconds: int = Field(default=60, ge=10, le=300)
     cache_ttl_seconds: int = Field(default=86400, ge=60)
