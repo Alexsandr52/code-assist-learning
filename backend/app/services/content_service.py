@@ -696,6 +696,19 @@ class ContentService:
                     "solution": "pwd\nmkdir reports\ncd reports\nhead -20 access.log",
                 },
             },
+            "files-directories": {
+                "blocks": [
+                    {"title": "Поиск файлов", "code": "find . -maxdepth 2 -type f -name \"*.log\"", "explanation": "find ищет файлы по глубине, типу и маске имени."},
+                    {"title": "Копирование", "code": "mkdir -p archive\ncp app.log archive/app.log", "explanation": "mkdir -p готовит директорию, cp копирует файл."},
+                    {"title": "Проверка размера", "code": "ls -lh archive\ndu -sh archive", "explanation": "ls -lh и du -sh показывают размер файлов и директории."},
+                ],
+                "exercise": {
+                    "description": "Найдите JSON-файлы на глубине 2, скопируйте config.json в backup и проверьте размер backup.",
+                    "starterCode": "find . -maxdepth 2 -type f -name \"*.json\"\n",
+                    "hint": "Используйте mkdir -p, cp и du -sh.",
+                    "solution": "find . -maxdepth 2 -type f -name \"*.json\"\nmkdir -p backup\ncp config.json backup/config.json\ndu -sh backup",
+                },
+            },
             "pipes-grep-redirection": {
                 "blocks": [
                     {"title": "grep", "code": "grep \"ERROR\" app.log\ngrep -n \"timeout\" app.log", "explanation": "grep ищет строки, -n добавляет номера строк."},
@@ -707,6 +720,19 @@ class ContentService:
                     "starterCode": "grep \"WARN\" service.log\n",
                     "hint": "Используйте > для сохранения и wc -l для подсчёта.",
                     "solution": "grep \"WARN\" service.log > warnings.log\nwc -l warnings.log\nhead -5 warnings.log",
+                },
+            },
+            "permissions-processes": {
+                "blocks": [
+                    {"title": "Права", "code": "ls -l scripts\nchmod u+x scripts/run.sh", "explanation": "ls -l показывает права, chmod u+x добавляет запуск владельцу."},
+                    {"title": "Процессы", "code": "ps aux | grep \"worker\"\npgrep -fl \"worker\"", "explanation": "ps и pgrep помогают найти процессы по имени."},
+                    {"title": "Окружение", "code": "env | sort | grep \"APP_\"\nwhich python", "explanation": "env показывает переменные, which помогает понять путь к бинарнику."},
+                ],
+                "exercise": {
+                    "description": "Сделайте scripts/check.sh исполняемым, найдите процессы api и путь к uvicorn.",
+                    "starterCode": "ls -l scripts\n",
+                    "hint": "Нужны chmod u+x, pgrep -fl и which.",
+                    "solution": "ls -l scripts\nchmod u+x scripts/check.sh\npgrep -fl \"api\"\nwhich uvicorn",
                 },
             },
             "system-diagnostics": {
@@ -722,6 +748,19 @@ class ContentService:
                     "solution": "df -h\npgrep -fl \"python\"\ncurl -I http://127.0.0.1:8000/health",
                 },
             },
+            "logs-journals": {
+                "blocks": [
+                    {"title": "Последние строки", "code": "tail -100 app.log\ntail -f app.log", "explanation": "tail показывает конец файла и может следить за обновлениями."},
+                    {"title": "Фильтрация", "code": "grep -n \"ERROR\" app.log | tail -20", "explanation": "grep с pipe помогает быстро сузить лог до нужных событий."},
+                    {"title": "systemd logs", "code": "journalctl -u app.service --since \"1 hour ago\"\njournalctl -u app.service -n 50", "explanation": "journalctl читает журналы systemd-сервисов."},
+                ],
+                "exercise": {
+                    "description": "Покажите последние ERROR из app.log и последние 50 строк журнала nginx.service.",
+                    "starterCode": "tail -100 app.log\n",
+                    "hint": "Комбинируйте grep, tail и journalctl -n.",
+                    "solution": "tail -100 app.log\ngrep -n \"ERROR\" app.log | tail -20\njournalctl -u nginx.service -n 50",
+                },
+            },
             "git-basics": {
                 "blocks": [
                     {"title": "Статус", "code": "git status\ngit diff -- README.md", "explanation": "status показывает состояние рабочей копии, diff показывает изменения."},
@@ -733,6 +772,19 @@ class ContentService:
                     "starterCode": "git status --short\n",
                     "hint": "Последовательность: status, diff, add, commit.",
                     "solution": "git status --short\ngit diff -- notes.md\ngit add notes.md\ngit commit -m \"docs: update notes\"",
+                },
+            },
+            "git-diff-staging": {
+                "blocks": [
+                    {"title": "Рабочий diff", "code": "git diff\ngit diff -- app.py", "explanation": "git diff показывает незастейдженные изменения."},
+                    {"title": "Staged diff", "code": "git add app.py\ngit diff --cached", "explanation": "git diff --cached показывает то, что попадёт в коммит."},
+                    {"title": "Частичный add", "code": "git add -p app.py\ngit status --short", "explanation": "git add -p позволяет выбрать отдельные hunks."},
+                ],
+                "exercise": {
+                    "description": "Проверьте изменения в app.py, добавьте их частично и посмотрите staged diff.",
+                    "starterCode": "git diff -- app.py\n",
+                    "hint": "Используйте git add -p и git diff --cached.",
+                    "solution": "git diff -- app.py\ngit add -p app.py\ngit diff --cached\ngit status --short",
                 },
             },
             "git-branches-remotes": {
@@ -748,6 +800,19 @@ class ContentService:
                     "solution": "git fetch origin\ngit switch -c feature/git-practice\ngit status -sb\ngit push -u origin feature/git-practice",
                 },
             },
+            "git-merge-conflicts": {
+                "blocks": [
+                    {"title": "Подготовка", "code": "git fetch origin\ngit switch feature/api", "explanation": "Перед merge стоит обновить remote refs и перейти в рабочую ветку."},
+                    {"title": "Merge", "code": "git merge origin/main\ngit status --short", "explanation": "merge подтягивает изменения main и status показывает конфликты."},
+                    {"title": "Разрешение", "code": "git add backend/app.py\ngit commit -m \"fix: resolve api merge\"", "explanation": "После ручного исправления конфликтный файл добавляют и завершают merge-коммит."},
+                ],
+                "exercise": {
+                    "description": "Слейте origin/main в feature/auth и завершите конфликт в auth.py.",
+                    "starterCode": "git fetch origin\n",
+                    "hint": "Последовательность: switch, merge, status, add, commit.",
+                    "solution": "git fetch origin\ngit switch feature/auth\ngit merge origin/main\ngit status --short\ngit add auth.py\ngit commit -m \"fix: resolve auth merge\"",
+                },
+            },
             "git-history-recovery": {
                 "blocks": [
                     {"title": "История", "code": "git log --oneline --decorate -10\ngit show --stat HEAD", "explanation": "log и show помогают понять последние изменения."},
@@ -759,6 +824,19 @@ class ContentService:
                     "starterCode": "git log --oneline -5\n",
                     "hint": "Используйте show, diff и restore --source для одного файла.",
                     "solution": "git log --oneline -5\ngit show --stat HEAD\ngit diff HEAD~1..HEAD -- docs/guide.md\ngit restore --source=HEAD~1 -- docs/guide.md",
+                },
+            },
+            "git-stash-bisect": {
+                "blocks": [
+                    {"title": "Stash", "code": "git status --short\ngit stash push -m \"wip api debug\"", "explanation": "stash временно сохраняет незавершённые изменения."},
+                    {"title": "Возврат", "code": "git stash list\ngit stash show --stat stash@{0}", "explanation": "list и show помогают выбрать нужный stash."},
+                    {"title": "Bisect", "code": "git bisect start\ngit bisect bad\ngit bisect good v1.2.0", "explanation": "bisect запускает бинарный поиск коммита, который внёс регрессию."},
+                ],
+                "exercise": {
+                    "description": "Сохраните WIP-изменения, посмотрите stash и начните bisect между HEAD и v1.0.0.",
+                    "starterCode": "git status --short\n",
+                    "hint": "Используйте stash push, stash list и git bisect.",
+                    "solution": "git status --short\ngit stash push -m \"wip terminal practice\"\ngit stash list\ngit bisect start\ngit bisect bad\ngit bisect good v1.0.0",
                 },
             },
             "conda-basics": {
@@ -774,6 +852,19 @@ class ContentService:
                     "solution": "conda --version\nconda env list\nconda list numpy",
                 },
             },
+            "conda-package-search": {
+                "blocks": [
+                    {"title": "Поиск", "code": "conda search pandas\nconda search \"numpy>=1.26\"", "explanation": "conda search помогает найти доступные версии пакетов."},
+                    {"title": "Информация", "code": "conda info pandas\nconda list --explicit", "explanation": "info и list --explicit полезны для диагностики пакетов."},
+                    {"title": "Проверка канала", "code": "conda config --show channels\nconda config --show channel_priority", "explanation": "Порядок каналов влияет на выбор сборок."},
+                ],
+                "exercise": {
+                    "description": "Найдите версии scipy, проверьте каналы и покажите явно установленные пакеты.",
+                    "starterCode": "conda search scipy\n",
+                    "hint": "Добавьте config --show channels и list --explicit.",
+                    "solution": "conda search scipy\nconda config --show channels\nconda config --show channel_priority\nconda list --explicit",
+                },
+            },
             "conda-project-envs": {
                 "blocks": [
                     {"title": "Создание", "code": "conda create -n ml-lab python=3.12\nconda activate ml-lab", "explanation": "create создаёт изолированное окружение с нужной версией Python."},
@@ -785,6 +876,19 @@ class ContentService:
                     "starterCode": "conda create -n api-lab python=3.12\n",
                     "hint": "После activate используйте conda install и env export --from-history.",
                     "solution": "conda create -n api-lab python=3.12\nconda activate api-lab\nconda install fastapi uvicorn\nconda env export --from-history > environment.yml",
+                },
+            },
+            "conda-channels-priority": {
+                "blocks": [
+                    {"title": "Каналы", "code": "conda config --show channels\nconda config --add channels conda-forge", "explanation": "channels задают источники пакетов."},
+                    {"title": "Приоритет", "code": "conda config --set channel_priority strict\nconda config --show channel_priority", "explanation": "strict priority снижает риск смешивания несовместимых сборок."},
+                    {"title": "Установка", "code": "conda install -c conda-forge httpx\nconda list httpx", "explanation": "-c явно выбирает канал для установки пакета."},
+                ],
+                "exercise": {
+                    "description": "Добавьте conda-forge, включите strict priority и установите python-dotenv из conda-forge.",
+                    "starterCode": "conda config --show channels\n",
+                    "hint": "Нужны config --add, config --set и install -c.",
+                    "solution": "conda config --add channels conda-forge\nconda config --set channel_priority strict\nconda install -c conda-forge python-dotenv\nconda list python-dotenv",
                 },
             },
             "conda-reproducibility": {
@@ -800,6 +904,19 @@ class ContentService:
                     "solution": "conda env export --from-history > environment.yml\nconda env create -f environment.yml\nconda env update -f environment.yml --prune\nconda list",
                 },
             },
+            "conda-troubleshooting": {
+                "blocks": [
+                    {"title": "Информация", "code": "conda info\nconda env list", "explanation": "Базовая диагностика начинается с версии, каналов и списка окружений."},
+                    {"title": "Проверка пакета", "code": "conda list pandas\npython -c \"import pandas; print(pandas.__version__)\"", "explanation": "Важно сверять пакет в conda и импорт в активном Python."},
+                    {"title": "Обновление metadata", "code": "conda update conda\nconda clean --index-cache", "explanation": "Обновление conda и очистка index cache помогают при проблемах resolver."},
+                ],
+                "exercise": {
+                    "description": "Проверьте активное окружение, версию numpy при импорте и очистите index cache.",
+                    "starterCode": "conda info\n",
+                    "hint": "Используйте conda env list, conda list и python -c.",
+                    "solution": "conda info\nconda env list\nconda list numpy\npython -c \"import numpy; print(numpy.__version__)\"\nconda clean --index-cache",
+                },
+            },
             "docker-basics": {
                 "blocks": [
                     {"title": "Версия", "code": "docker --version\ndocker info", "explanation": "Проверяет клиент Docker и доступность daemon."},
@@ -811,6 +928,19 @@ class ContentService:
                     "starterCode": "docker --version\n",
                     "hint": "Используйте docker run --name, затем ps и logs.",
                     "solution": "docker --version\ndocker run --name docs-web -p 8080:80 nginx:alpine\ndocker ps\ndocker logs docs-web",
+                },
+            },
+            "docker-images": {
+                "blocks": [
+                    {"title": "Список", "code": "docker image ls\ndocker image ls nginx", "explanation": "image ls показывает локальные образы и их теги."},
+                    {"title": "Pull", "code": "docker pull nginx:alpine\ndocker image inspect nginx:alpine", "explanation": "pull скачивает образ, inspect показывает metadata."},
+                    {"title": "History", "code": "docker image history nginx:alpine", "explanation": "history показывает слои образа."},
+                ],
+                "exercise": {
+                    "description": "Скачайте redis:alpine, проверьте образ и посмотрите его слои.",
+                    "starterCode": "docker image ls\n",
+                    "hint": "Нужны docker pull, image inspect и image history.",
+                    "solution": "docker image ls\ndocker pull redis:alpine\ndocker image inspect redis:alpine\ndocker image history redis:alpine",
                 },
             },
             "docker-compose": {
@@ -826,6 +956,19 @@ class ContentService:
                     "solution": "docker compose up -d --build backend frontend\ndocker compose ps\ndocker compose logs --tail=80 backend",
                 },
             },
+            "docker-volumes-networks": {
+                "blocks": [
+                    {"title": "Volumes", "code": "docker volume ls\ndocker volume inspect postgres-data", "explanation": "volume ls и inspect помогают понять, где хранятся данные."},
+                    {"title": "Networks", "code": "docker network ls\ndocker network inspect app_default", "explanation": "network inspect показывает контейнеры и настройки сети."},
+                    {"title": "Compose resources", "code": "docker compose ps\ndocker compose exec backend hostname", "explanation": "compose exec помогает проверять сеть изнутри сервиса."},
+                ],
+                "exercise": {
+                    "description": "Проверьте volume postgres-data, сеть app_default и hostname backend-сервиса.",
+                    "starterCode": "docker volume ls\n",
+                    "hint": "Используйте volume inspect, network inspect и compose exec.",
+                    "solution": "docker volume inspect postgres-data\ndocker network inspect app_default\ndocker compose exec backend hostname",
+                },
+            },
             "docker-debug-build": {
                 "blocks": [
                     {"title": "Слои", "code": "docker build --progress=plain -t cla-backend ./backend", "explanation": "--progress=plain делает лог сборки подробным и пригодным для диагностики."},
@@ -837,6 +980,19 @@ class ContentService:
                     "starterCode": "docker build --progress=plain -t cla-backend ./backend\n",
                     "hint": "Добавьте image history и compose exec env.",
                     "solution": "docker build --progress=plain -t cla-backend ./backend\ndocker image history cla-backend\ndocker compose exec backend env",
+                },
+            },
+            "docker-production-diagnostics": {
+                "blocks": [
+                    {"title": "Health", "code": "docker compose ps\ncurl -I http://127.0.0.1:3000", "explanation": "Проверяет статус compose-сервисов и HTTP-доступность frontend."},
+                    {"title": "Logs", "code": "docker compose logs --tail=120 backend\ndocker compose logs --tail=120 frontend", "explanation": "Свежие логи backend и frontend обычно быстрее всего показывают причину сбоя."},
+                    {"title": "Env", "code": "docker compose exec backend printenv\ndocker compose exec frontend printenv", "explanation": "printenv внутри контейнера проверяет фактические переменные окружения."},
+                ],
+                "exercise": {
+                    "description": "Проверьте compose-статус, последние backend-логи и переменные backend-контейнера.",
+                    "starterCode": "docker compose ps\n",
+                    "hint": "Добавьте logs --tail и compose exec backend printenv.",
+                    "solution": "docker compose ps\ndocker compose logs --tail=120 backend\ndocker compose exec backend printenv",
                 },
             },
         }

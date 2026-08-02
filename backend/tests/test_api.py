@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -40,6 +41,14 @@ def test_catalog_includes_terminal_libraries_and_topics():
     topics_response = client.get("/api/topics?library=git&difficulty=advanced")
     assert topics_response.status_code == 200
     assert any(item["slug"] == "git-history-recovery" for item in topics_response.json())
+
+
+@pytest.mark.parametrize("library", ["linux", "git", "conda", "docker"])
+@pytest.mark.parametrize("difficulty", ["beginner", "intermediate", "advanced"])
+def test_terminal_catalog_has_multiple_topics_per_level(library, difficulty):
+    response = client.get(f"/api/topics?library={library}&difficulty={difficulty}")
+    assert response.status_code == 200
+    assert len(response.json()) >= 2
 
 
 def test_create_fallback_practice_session():
@@ -138,3 +147,39 @@ def test_terminal_git_fallback_matches_selected_topic():
     assert payload["topic"] == "git-branches-remotes"
     assert "git switch -c" in all_code
     assert "git push -u" in all_code
+
+
+@pytest.mark.parametrize(
+    ("library", "topic", "difficulty"),
+    [
+        ("linux", "files-directories", "beginner"),
+        ("linux", "permissions-processes", "intermediate"),
+        ("linux", "logs-journals", "advanced"),
+        ("git", "git-diff-staging", "beginner"),
+        ("git", "git-merge-conflicts", "intermediate"),
+        ("git", "git-stash-bisect", "advanced"),
+        ("conda", "conda-package-search", "beginner"),
+        ("conda", "conda-channels-priority", "intermediate"),
+        ("conda", "conda-troubleshooting", "advanced"),
+        ("docker", "docker-images", "beginner"),
+        ("docker", "docker-volumes-networks", "intermediate"),
+        ("docker", "docker-production-diagnostics", "advanced"),
+    ],
+)
+def test_new_terminal_fallback_topics_match_selection(library, topic, difficulty):
+    response = client.post(
+        "/api/practice-sessions",
+        json={
+            "language": "terminal",
+            "library": library,
+            "topic": topic,
+            "difficulty": difficulty,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "fallback"
+    assert payload["library"] == library
+    assert payload["topic"] == topic
+    assert payload["difficulty"] == difficulty
+    assert len(payload["blocks"]) >= 3

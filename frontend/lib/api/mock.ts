@@ -56,17 +56,29 @@ export const mockTopics: Topic[] = [
   { id: "topic_re_logs_advanced", library: "re", name: "Парсинг логов", slug: "log-parsing", difficulty: "advanced" },
   { id: "topic_re_cleanup_advanced", library: "re", name: "Очистка и преобразование", slug: "cleanup-pipelines", difficulty: "advanced" },
   { id: "topic_linux_basics_beginner", library: "linux", name: "Основы Linux", slug: "linux-basics", difficulty: "beginner" },
+  { id: "topic_linux_files_beginner", library: "linux", name: "Файлы и директории", slug: "files-directories", difficulty: "beginner" },
   { id: "topic_linux_pipes_intermediate", library: "linux", name: "Pipes, grep и перенаправления", slug: "pipes-grep-redirection", difficulty: "intermediate" },
+  { id: "topic_linux_permissions_intermediate", library: "linux", name: "Права и процессы", slug: "permissions-processes", difficulty: "intermediate" },
   { id: "topic_linux_diagnostics_advanced", library: "linux", name: "Диагностика системы", slug: "system-diagnostics", difficulty: "advanced" },
+  { id: "topic_linux_logs_advanced", library: "linux", name: "Логи и журналы", slug: "logs-journals", difficulty: "advanced" },
   { id: "topic_git_basics_beginner", library: "git", name: "Git: базовый цикл", slug: "git-basics", difficulty: "beginner" },
+  { id: "topic_git_diff_beginner", library: "git", name: "Git: diff и staging", slug: "git-diff-staging", difficulty: "beginner" },
   { id: "topic_git_branches_intermediate", library: "git", name: "Git: ветки и синхронизация", slug: "git-branches-remotes", difficulty: "intermediate" },
+  { id: "topic_git_conflicts_intermediate", library: "git", name: "Git: слияния и конфликты", slug: "git-merge-conflicts", difficulty: "intermediate" },
   { id: "topic_git_history_advanced", library: "git", name: "Git: история и восстановление", slug: "git-history-recovery", difficulty: "advanced" },
+  { id: "topic_git_stash_bisect_advanced", library: "git", name: "Git: stash и bisect", slug: "git-stash-bisect", difficulty: "advanced" },
   { id: "topic_conda_basics_beginner", library: "conda", name: "Conda: основы", slug: "conda-basics", difficulty: "beginner" },
+  { id: "topic_conda_packages_beginner", library: "conda", name: "Conda: поиск пакетов", slug: "conda-package-search", difficulty: "beginner" },
   { id: "topic_conda_envs_intermediate", library: "conda", name: "Conda: окружения проекта", slug: "conda-project-envs", difficulty: "intermediate" },
+  { id: "topic_conda_channels_intermediate", library: "conda", name: "Conda: каналы и приоритеты", slug: "conda-channels-priority", difficulty: "intermediate" },
   { id: "topic_conda_repro_advanced", library: "conda", name: "Conda: воспроизводимость", slug: "conda-reproducibility", difficulty: "advanced" },
+  { id: "topic_conda_troubleshooting_advanced", library: "conda", name: "Conda: диагностика окружений", slug: "conda-troubleshooting", difficulty: "advanced" },
   { id: "topic_docker_basics_beginner", library: "docker", name: "Docker: основы", slug: "docker-basics", difficulty: "beginner" },
+  { id: "topic_docker_images_beginner", library: "docker", name: "Docker: образы", slug: "docker-images", difficulty: "beginner" },
   { id: "topic_docker_compose_intermediate", library: "docker", name: "Docker Compose", slug: "docker-compose", difficulty: "intermediate" },
-  { id: "topic_docker_debug_advanced", library: "docker", name: "Docker: отладка и сборка", slug: "docker-debug-build", difficulty: "advanced" }
+  { id: "topic_docker_volumes_intermediate", library: "docker", name: "Docker: volumes и networks", slug: "docker-volumes-networks", difficulty: "intermediate" },
+  { id: "topic_docker_debug_advanced", library: "docker", name: "Docker: отладка и сборка", slug: "docker-debug-build", difficulty: "advanced" },
+  { id: "topic_docker_prod_advanced", library: "docker", name: "Docker: production диагностика", slug: "docker-production-diagnostics", difficulty: "advanced" }
 ];
 
 export const mockSession: PracticeSession = {
