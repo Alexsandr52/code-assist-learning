@@ -44,3 +44,26 @@ def test_rejects_dangerous_code():
     with pytest.raises(ValueError):
         validate_learning_content(raw)
 
+
+def test_rejects_invalid_python_syntax():
+    raw = {
+        **VALID_CONTENT,
+        "blocks": [
+            *VALID_CONTENT["blocks"][:2],
+            {"title": "Синтаксис", "code": "if True print(\"ok\")", "explanation": "Некорректный Python."},
+        ],
+    }
+    with pytest.raises(ValueError):
+        validate_learning_content(raw)
+
+
+def test_rejects_cyrillic_in_code():
+    raw = {
+        **VALID_CONTENT,
+        "blocks": [
+            *VALID_CONTENT["blocks"][:2],
+            {"title": "Кириллица", "code": "дни = [\"Пн\", \"Вт\"]\nprint(дни)", "explanation": "Кириллические идентификаторы."},
+        ],
+    }
+    with pytest.raises(ValueError):
+        validate_learning_content(raw)

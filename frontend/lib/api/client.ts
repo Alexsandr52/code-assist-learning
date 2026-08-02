@@ -1,6 +1,7 @@
 import type { Difficulty, Language, Library, PracticeSession, Topic } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const REQUEST_TIMEOUT_MS = 25000;
 
 export class ApiError extends Error {
   constructor(
@@ -52,12 +53,26 @@ export async function completePracticeSession(sessionId: string, stats: {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
-  if (!response.ok) {
-    const detail = await readErrorDetail(response);
-    throw new ApiError(`API request failed: ${response.status}`, response.status, detail);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const detail = await readErrorDetail(response);
+      throw new ApiError(`API request failed: ${response.status}`, response.status, detail);
+    }
+    return response.json() as Promise<T>;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("API request timed out", 408, "Запрос к backend занял слишком много времени.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-  return response.json() as Promise<T>;
 }
 
 async function readErrorDetail(response: Response): Promise<string | undefined> {
