@@ -185,7 +185,7 @@ export function PracticeApp() {
       return;
     }
     setIsLoading(true);
-    setNotice("");
+    setNotice("Запрос на создание урока отправлен...");
     const practiceRequest = {
       language,
       library,
