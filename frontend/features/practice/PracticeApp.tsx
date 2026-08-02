@@ -33,10 +33,18 @@ type CompletionSummary = {
 
 type FooterPanel = "author" | "coffee" | "about" | null;
 
+function getMockLibraries(languageSlug: string) {
+  return mockLibraries.filter((item) => item.language === languageSlug);
+}
+
+function getMockTopics(librarySlug: string, difficultyValue: Difficulty) {
+  return mockTopics.filter((item) => item.library === librarySlug && item.difficulty === difficultyValue);
+}
+
 export function PracticeApp() {
   const [languages, setLanguages] = useState<Language[]>(mockLanguages);
-  const [libraries, setLibraries] = useState<Library[]>(mockLibraries);
-  const [topics, setTopics] = useState<Topic[]>(mockTopics);
+  const [libraries, setLibraries] = useState<Library[]>(() => getMockLibraries("python"));
+  const [topics, setTopics] = useState<Topic[]>(() => getMockTopics("requests", "beginner"));
   const [language, setLanguage] = useState("python");
   const [library, setLibrary] = useState("requests");
   const [topic, setTopic] = useState("get-requests");
@@ -97,7 +105,7 @@ export function PracticeApp() {
         if (!isCurrent) {
           return;
         }
-        setLibraries(mockLibraries);
+        setLibraries(getMockLibraries(language));
         setCatalogNotice("Backend недоступен, библиотеки открыты из локального mock.");
       });
     return () => {
@@ -128,8 +136,19 @@ export function PracticeApp() {
         if (!isCurrent) {
           return;
         }
-        setTopics([]);
-        setCatalogNotice("Для выбранной библиотеки и сложности пока нет активных тем.");
+        const fallbackTopics = getMockTopics(library, difficulty);
+        setTopics(fallbackTopics);
+        setTopic((currentTopic) => {
+          if (fallbackTopics.length === 0) {
+            return "";
+          }
+          return fallbackTopics.some((item) => item.slug === currentTopic) ? currentTopic : fallbackTopics[0].slug;
+        });
+        setCatalogNotice(
+          fallbackTopics.length === 0
+            ? "Для выбранной библиотеки и сложности пока нет активных тем."
+            : "Backend недоступен, темы открыты из локального mock."
+        );
       })
       .finally(() => {
         if (isCurrent) {
